@@ -1,0 +1,49 @@
+Index: include/clang/Lex/PPCallbacks.h
+===================================================================
+--- include/clang/Lex/PPCallbacks.h	(revision 302379)
++++ include/clang/Lex/PPCallbacks.h	(working copy)
+@@ -320,6 +320,12 @@
+   /// \param IfLoc the source location of the \#if/\#ifdef/\#ifndef directive.
+   virtual void Endif(SourceLocation Loc, SourceLocation IfLoc) {
+   }
++
++  /// \brief Hook called whenever an macro identifier is found in a result 
++  /// of a macro expansion.
++  /// \param Tok the identifier token that has been expanded.
++  virtual void RecursiveExpansion(const Token& Tok) {
++  }
+ };
+ 
+ /// \brief Simple wrapper class for chaining callbacks.
+@@ -506,6 +512,11 @@
+     First->Endif(Loc, IfLoc);
+     Second->Endif(Loc, IfLoc);
+   }
++
++  void RecursiveExpansion(const Token& Tok) override {
++	  First->RecursiveExpansion(Tok);
++	  Second->RecursiveExpansion(Tok);
++  }
+ };
+ 
+ }  // end namespace clang
+Index: lib/Lex/TokenLexer.cpp
+===================================================================
+--- lib/Lex/TokenLexer.cpp	(revision 302379)
++++ lib/Lex/TokenLexer.cpp	(working copy)
+@@ -513,8 +513,13 @@
+       PP.HandlePoisonedIdentifier(Tok);
+     }
+ 
+-    if (!DisableMacroExpansion && II->isHandleIdentifierCase())
+-      return PP.HandleIdentifier(Tok);
++	if (!DisableMacroExpansion && II->isHandleIdentifierCase()) {
++		auto Callbacks = PP.getPPCallbacks();
++		if (Callbacks) {
++			Callbacks->RecursiveExpansion(Tok);
++		}
++		return PP.HandleIdentifier(Tok);
++	}
+   }
+ 
+   // Otherwise, return a normal token.
