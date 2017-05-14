@@ -2,11 +2,11 @@ Index: pp-trace/ArgTokens.cpp
 ===================================================================
 --- pp-trace/ArgTokens.cpp	(nonexistent)
 +++ pp-trace/ArgTokens.cpp	(working copy)
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,33 @@
 +#include "ArgTokens.h"
 +
 +void ArgTokens::Init(const MacroDefinition &MD,
-+  const clang::MacroArgs *ActArgs, clang::Preprocessor& PP,	bool BuildCache) {
++  const clang::MacroArgs *ActArgs, clang::Preprocessor& PP) {
 +
 +  if (!ActArgs) {
 +    return;
@@ -20,21 +20,14 @@ Index: pp-trace/ArgTokens.cpp
 +
 +	for (auto I = 0u, E = ActArgs->getNumArguments(); I < E; ++I) {
 +		auto Current = ActArgs->getUnexpArgument(I);
-+		auto TokenCount = ActArgs->getArgLength(Current) + 1; // include EOF
++		auto TokenCount = ActArgs->getArgLength(Current) + 1;
 +		E -= TokenCount;
-+
-+		// We're assuming tokens are contiguous, as otherwise we have no
-+		// other way to get at them.
 +		--TokenCount;
 +
-+		if (BuildCache) {
-+      Cache.push_back(std::make_tuple(DefArgs[I]->getName(),
++    Cache.push_back(std::make_tuple(DefArgs[I]->getName(),
 +        std::tuple_element<1, decltype(Cache)::value_type>::type()));
-+		}
 +		for (auto TokenIndex = 0u; TokenIndex < TokenCount; ++TokenIndex, ++Current) {
-+			if (BuildCache) {
 +				std::get<1>(Cache.back()).push_back(PP.getSpelling(*Current));
-+			}
 +		}
 +	}
 +}
@@ -47,7 +40,7 @@ Index: pp-trace/ArgTokens.h
 ===================================================================
 --- pp-trace/ArgTokens.h	(nonexistent)
 +++ pp-trace/ArgTokens.h	(working copy)
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,37 @@
 +#ifndef PPTRACE_ARGTOKENS_H
 +#define PPTRACE_ARGTOKENS_H
 +
@@ -69,12 +62,10 @@ Index: pp-trace/ArgTokens.h
 +    >
 +  > Cache;
 +
-+	//ArgTokens(const ArgTokens& other) = delete;
-+
 +public:
 +
 +	void Init(const MacroDefinition &MacroDefinition, const MacroArgs *ActualArgs,
-+    Preprocessor& PP, bool BuildCache);
++    Preprocessor& PP);
 +
 +	auto begin() const { return Cache.cbegin(); }
 +	auto end() const { return Cache.cend(); }
@@ -92,7 +83,7 @@ Index: pp-trace/CallbackCall.h
 ===================================================================
 --- pp-trace/CallbackCall.h	(nonexistent)
 +++ pp-trace/CallbackCall.h	(working copy)
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,116 @@
 +#ifndef PPTRACE_CALLBACKCALL_H
 +#define PPTRACE_CALLBACKCALL_H
 +
@@ -107,12 +98,7 @@ Index: pp-trace/CallbackCall.h
 +
 +/// \brief This class represents one callback function argument by name
 +///   and value.
-+class Argument {
-+public:
-+  Argument(llvm::StringRef Name, llvm::StringRef Value)
-+      : Name(Name), Value(Value) {}
-+  Argument() = default;
-+
++struct Argument {
 +  std::string Name;
 +  std::string Value;
 +};
@@ -129,10 +115,6 @@ Index: pp-trace/CallbackCall.h
 +};
 +
 +class CallbackCalls {
-+
-+protected:
-+	/// \brief Inhibit trace while this is set.
-+	bool DisableTrace;
 +
 +public:
 +	CallbackCalls(llvm::SmallSet<std::string, 4> &Ignore);
@@ -205,6 +187,9 @@ Index: pp-trace/CallbackCall.h
 +
 +private:
 +
++  /// \brief Inhibit trace while this is set.
++  bool DisableTrace;
++
 +	/// \brief Callback trace information.
 +	/// We use a reference so the trace will be preserved for the caller
 +	/// after this object is destructed.
@@ -214,21 +199,13 @@ Index: pp-trace/CallbackCall.h
 +	llvm::SmallSet<std::string, 4> &Ignore;
 +};
 +
-+
-+class CallbackCallsVerbose : public CallbackCalls {
-+public:
-+	CallbackCallsVerbose(llvm::SmallSet<std::string, 4> &Ignore) : CallbackCalls(Ignore) {}
-+	virtual ~CallbackCallsVerbose() {}
-+	virtual void appendArgument(const char *Name, clang::SourceRange Value, clang::Preprocessor& PP) override;
-+};
-+
 +#endif PPTRACE_CALLBACKCALL_H // PPTRACE_CALLBACKCALL_H
 \ No newline at end of file
 Index: pp-trace/CallbackCalls.cpp
 ===================================================================
 --- pp-trace/CallbackCalls.cpp	(nonexistent)
 +++ pp-trace/CallbackCalls.cpp	(working copy)
-@@ -0,0 +1,257 @@
+@@ -0,0 +1,232 @@
 +#include "CallbackCall.h"
 +#include "Utils.h"
 +#include "clang/Lex/Preprocessor.h"
@@ -267,7 +244,7 @@ Index: pp-trace/CallbackCalls.cpp
 +void CallbackCalls::appendArgument(const char *Name, const char *Value) {
 +  if (DisableTrace)
 +    return;
-+  Calls.back().Arguments.push_back(Argument(Name, Value));
++  Calls.back().Arguments.push_back(Argument{ Name, Value });
 +}
 +
 +// Append a string object argument to the top trace item.
@@ -461,31 +438,6 @@ Index: pp-trace/CallbackCalls.cpp
 +  std::replace(Path.begin(), Path.end(), '\\', '/');
 +  appendQuotedArgument(Name, Path);
 +}
-+
-+void CallbackCallsVerbose::appendArgument(const char *Name,
-+	clang::SourceRange Value, clang::Preprocessor& PP) {
-+	if (DisableTrace)
-+		return;
-+	if (Value.isInvalid()) {
-+		CallbackCalls::appendArgument(Name, "(invalid)");
-+		return;
-+	}
-+	std::string Str;
-+	const auto sourceStr = getSourceString<clang::SourceRange>(PP, Value);
-+
-+	llvm::raw_string_ostream SS(Str);
-+	SS << "[" << getSourceLocationString(PP, Value.getBegin()) << ", "
-+		<< getSourceLocationString(PP, Value.getEnd()) << "]\n    ";
-+
-+	if (sourceStr.size()) {
-+		for (auto i = 0u; i < strlen(Name); ++i) {
-+			SS << " ";
-+		}
-+
-+		SS << sourceStr;
-+	}
-+	CallbackCalls::appendArgument(Name, SS.str());
-+}
 \ No newline at end of file
 Index: pp-trace/CMakeLists.txt
 ===================================================================
@@ -495,7 +447,7 @@ Index: pp-trace/CMakeLists.txt
  add_clang_executable(pp-trace
    PPTrace.cpp
    PPCallbacksTracker.cpp
-+  PPCallbacksVerbose.cpp
++  VerboseDecorator.cpp
 +  CallbackCalls.cpp
 +  ArgTokens.cpp
    )
@@ -505,7 +457,7 @@ Index: pp-trace/PPCallbacksTracker.cpp
 ===================================================================
 --- pp-trace/PPCallbacksTracker.cpp	(revision 302379)
 +++ pp-trace/PPCallbacksTracker.cpp	(working copy)
-@@ -1,654 +1,382 @@
+@@ -1,654 +1,395 @@
 -//===--- PPCallbacksTracker.cpp - Preprocessor tracker -*--*---------------===//
 -//
 -//                     The LLVM Compiler Infrastructure
@@ -888,9 +840,22 @@ Index: pp-trace/PPCallbacksTracker.cpp
 +
 +PPCallbacksTracker::PPCallbacksTracker(CallbackCalls &CallbackCalls,
 +                                       clang::Preprocessor &PP)
-+    : Calls(CallbackCalls), PP(PP) {}
++    : Calls(CallbackCalls), PP(PP) {
++  llvm::outs() << "PPCallbacksTracker CTOR\n";
++}
 +
-+PPCallbacksTracker::~PPCallbacksTracker() {}
++
++PPCallbacksTracker::PPCallbacksTracker(PPCallbacksTracker&& o)
++  : Calls(o.Calls), PP(o.PP) {
++
++  llvm::outs() << "MOVE CTOR\n";
++}
++
++PPCallbacksTracker& PPCallbacksTracker::operator=(PPCallbacksTracker&& o) {
++  llvm::outs() << "MOVE ASSIGN\n";
++
++  return *this;
++}
 +
 +// Callback functions.
 +
@@ -1107,7 +1072,7 @@ Index: pp-trace/PPCallbacksTracker.cpp
 +  Calls.appendArgument("Range", Range, PP);
 +
 +  if (MacroDefinition.getMacroInfo()->isFunctionLike()) {
-+    CurrArgs.Init(MacroDefinition, Args, PP, BuildCache());
++    CurrArgs.Init(MacroDefinition, Args, PP);
 +    Calls.appendArgument("Args", &CurrArgs);
 +  }
 +}
@@ -1545,7 +1510,7 @@ Index: pp-trace/PPCallbacksTracker.h
 ===================================================================
 --- pp-trace/PPCallbacksTracker.h	(revision 302379)
 +++ pp-trace/PPCallbacksTracker.h	(working copy)
-@@ -1,247 +1,156 @@
+@@ -1,247 +1,158 @@
 -//===--- PPCallbacksTracker.h - Preprocessor tracking -----------*- C++ -*-===//
 -//
 -//                     The LLVM Compiler Infrastructure
@@ -1751,7 +1716,11 @@ Index: pp-trace/PPCallbacksTracker.h
 +  PPCallbacksTracker(CallbackCalls &CallbackCalls,
 +                     clang::Preprocessor &PP);
 +
-+  virtual ~PPCallbacksTracker() override;
++  PPCallbacksTracker(PPCallbacksTracker&& o);
++
++  PPCallbacksTracker& operator=(PPCallbacksTracker&& o);
++
++  ~PPCallbacksTracker() { llvm::outs() << "PPCallbacksTracker DTOR\n"; }
 +
 +  // Overidden callback functions.
 +
@@ -1932,13 +1901,11 @@ Index: pp-trace/PPCallbacksTracker.h
 +             clang::SourceLocation IfLoc) override;
 +  void RecursiveExpansion(const clang::Token& Tok) override;
 +
-+  // Helper functions.
++  auto GetCurrentArgs() const { return &CurrArgs; }
 +
-+protected:
++  auto& GetCalls() const { return Calls; }
 +
-+  /// \brief Template method for 
-+  virtual bool BuildCache() { return true; }
-+protected:
++private:
 +
 +  clang::Preprocessor &PP;
 +  CallbackCalls &Calls;
@@ -1947,87 +1914,6 @@ Index: pp-trace/PPCallbacksTracker.h
 +
 +
 +#endif // PPTRACE_PPCALLBACKSTRACKER_H
-Index: pp-trace/PPCallbacksVerbose.cpp
-===================================================================
---- pp-trace/PPCallbacksVerbose.cpp	(nonexistent)
-+++ pp-trace/PPCallbacksVerbose.cpp	(working copy)
-@@ -0,0 +1,51 @@
-+#include "PPCallbacksVerbose.h"
-+#include <numeric>
-+
-+using namespace llvm;
-+using namespace clang;
-+
-+PPCallbacksVerbose::PPCallbacksVerbose(CallbackCalls& CallbackCalls,
-+	                                   clang::Preprocessor & PP)
-+	: PPCallbacksTracker(CallbackCalls, PP)
-+{
-+}
-+
-+PPCallbacksVerbose::~PPCallbacksVerbose() {}
-+
-+void PPCallbacksVerbose::MacroExpands(const clang::Token &MacroNameTok,
-+	const clang::MacroDefinition &MD, clang::SourceRange Range,
-+	const clang::MacroArgs *Args) {
-+	PPCallbacksTracker::MacroExpands(MacroNameTok, MD, Range, Args);
-+
-+	const auto DefBody = MD.getMacroInfo()->tokens();
-+  auto RawDefBody = std::vector<std::string>(DefBody.size());
-+
-+	for (const auto& t : DefBody) {
-+    auto B = getCharacterData(PP, t.getLocation());
-+    const auto tok = StringRef(B, t.getLength());
-+    RawDefBody.push_back(tok);
-+	}
-+
-+  for (const auto &CurrArg : CurrArgs) {
-+    for (auto &BodyToken : RawDefBody) {
-+      if (std::get<0>(CurrArg).compare(BodyToken) == 0) {
-+        const auto& ArgTokens = std::get<1>(CurrArg);
-+        BodyToken =
-+          std::accumulate(ArgTokens.begin(), ArgTokens.end(), std::string(""));
-+      }
-+    }
-+  }
-+
-+	Calls.appendArgument("ExpandedTokens",
-+    std::accumulate(RawDefBody.begin(),RawDefBody.end(), std::string("")));
-+}
-+
-+void PPCallbacksVerbose::MacroDefined(const clang::Token &MacroNameTok,
-+	const clang::MacroDirective *MD) {
-+	PPCallbacksTracker::MacroDefined(MacroNameTok, MD);
-+
-+	const auto likeness = MD->getDefinition().getMacroInfo()->isObjectLike();
-+	Calls.appendArgument("Likeness",
-+		likeness ? "Object" : "Function");
-+	Calls.appendArgument("Loc", MD->getLocation(), PP);
-+}
-Index: pp-trace/PPCallbacksVerbose.h
-===================================================================
---- pp-trace/PPCallbacksVerbose.h	(nonexistent)
-+++ pp-trace/PPCallbacksVerbose.h	(working copy)
-@@ -0,0 +1,19 @@
-+#include "PPCallbacksTracker.h"
-+
-+class PPCallbacksVerbose : public PPCallbacksTracker {
-+public:
-+	PPCallbacksVerbose(CallbackCalls& CallbackCalls,
-+		clang::Preprocessor &PP);
-+
-+	virtual ~PPCallbacksVerbose() override;
-+
-+	void MacroExpands(const clang::Token &MacroNameTok,
-+		const clang::MacroDefinition &MD, clang::SourceRange Range,
-+		const clang::MacroArgs *Args) override;
-+	void MacroDefined(const clang::Token &MacroNameTok,
-+		const clang::MacroDirective *MD) override;
-+
-+protected:
-+  virtual bool BuildCache() override { return true; }
-+
-+};
-\ No newline at end of file
 Index: pp-trace/PPTrace.cpp
 ===================================================================
 --- pp-trace/PPTrace.cpp	(revision 302379)
@@ -2038,81 +1924,87 @@ Index: pp-trace/PPTrace.cpp
  
 +#include "Utils.h"
  #include "PPCallbacksTracker.h"
-+#include "PPCallbacksVerbose.h"
++#include "VerboseDecorator.h"
  #include "clang/AST/ASTConsumer.h"
  #include "clang/AST/ASTContext.h"
  #include "clang/AST/RecursiveASTVisitor.h"
-@@ -86,6 +88,11 @@
+@@ -86,6 +88,13 @@
                                           cl::desc("<source0> [... <sourceN>]"),
                                           cl::OneOrMore);
  
 +// Option to switch on verbose mode.
 +static cl::opt<bool> VerboseMode(
-+	"verbose", cl::init(false),
-+	cl::desc("Print more information."));
++  "verbose", cl::init(false),
++  cl::desc("Print more information,"
++   " showing expanded macro body in MacroExpands event"
++   " and macro type in MacroDefined."));
 +
  // Option to specify a list or one or more callback names to ignore.
  static cl::opt<std::string> IgnoreCallbacks(
      "ignore", cl::init(""),
-@@ -105,75 +112,47 @@
- 
- namespace {
+@@ -107,73 +116,51 @@
  // Consumer is responsible for setting up the callbacks.
-+template <typename Tracker>
  class PPTraceConsumer : public ASTConsumer {
  public:
 -  PPTraceConsumer(SmallSet<std::string, 4> &Ignore,
 -                  std::vector<CallbackCall> &CallbackCalls, Preprocessor &PP) {
-+  PPTraceConsumer(CallbackCalls &CallbackCalls, Preprocessor &PP) {
++  PPTraceConsumer(CallbackCalls &CallbackCalls, Preprocessor &PP, bool VerboseMode) {
      // PP takes ownership.
 -    PP.addPPCallbacks(llvm::make_unique<PPCallbacksTracker>(Ignore,
 -                                                            CallbackCalls, PP));
-+    PP.addPPCallbacks(llvm::make_unique<Tracker>(CallbackCalls, PP));
++    auto Tracker = llvm::make_unique<PPCallbacksTracker>(CallbackCalls, PP);
++    if (VerboseMode) {
++      PP.addPPCallbacks(llvm::make_unique<VerboseDecorator>(CallbackCalls, PP,
++        std::move(Tracker)));
++    }
++    else {
++      PP.addPPCallbacks(std::move(Tracker));
++    }
    }
  };
  
-+template <typename Tracker>
  class PPTraceAction : public SyntaxOnlyAction {
  public:
 -  PPTraceAction(SmallSet<std::string, 4> &Ignore,
 -                std::vector<CallbackCall> &CallbackCalls)
 -      : Ignore(Ignore), CallbackCalls(CallbackCalls) {}
-+  PPTraceAction(CallbackCalls &CallbackCalls)
-+      : CallbackCalls(CallbackCalls) {}
++  PPTraceAction(CallbackCalls &CallbackCalls, bool VerboseMode)
++      : CallbackCalls(CallbackCalls), VerboseMode(VerboseMode) {}
  
  protected:
    std::unique_ptr<clang::ASTConsumer>
    CreateASTConsumer(CompilerInstance &CI, StringRef InFile) override {
 -    return llvm::make_unique<PPTraceConsumer>(Ignore, CallbackCalls,
-+    return llvm::make_unique<PPTraceConsumer<Tracker>>(CallbackCalls,
-                                               CI.getPreprocessor());
+-                                              CI.getPreprocessor());
++    return llvm::make_unique<PPTraceConsumer>(CallbackCalls,
++                                              CI.getPreprocessor(), VerboseMode);
    }
  
  private:
 -  SmallSet<std::string, 4> &Ignore;
 -  std::vector<CallbackCall> &CallbackCalls;
 +  CallbackCalls &CallbackCalls;
++  bool VerboseMode;
  };
  
-+template <typename Tracker>
  class PPTraceFrontendActionFactory : public FrontendActionFactory {
  public:
 -  PPTraceFrontendActionFactory(SmallSet<std::string, 4> &Ignore,
 -                               std::vector<CallbackCall> &CallbackCalls)
 -      : Ignore(Ignore), CallbackCalls(CallbackCalls) {}
-+  PPTraceFrontendActionFactory(CallbackCalls &CallbackCalls)
-+      : CallbackCalls(CallbackCalls) {}
++  PPTraceFrontendActionFactory(CallbackCalls &CallbackCalls, bool VerboseMode)
++      : CallbackCalls(CallbackCalls), VerboseMode(VerboseMode) {}
  
--  PPTraceAction *create() override {
+   PPTraceAction *create() override {
 -    return new PPTraceAction(Ignore, CallbackCalls);
-+  PPTraceAction<Tracker> *create() override {
-+    return new PPTraceAction<Tracker>(CallbackCalls);
++    return new PPTraceAction(CallbackCalls, VerboseMode);
    }
  
  private:
 -  SmallSet<std::string, 4> &Ignore;
 -  std::vector<CallbackCall> &CallbackCalls;
 +  CallbackCalls &CallbackCalls;
++  bool VerboseMode;
  };
  } // namespace
  
@@ -2144,7 +2036,7 @@ Index: pp-trace/PPTrace.cpp
  // Program entry point.
  int main(int Argc, const char **Argv) {
  
-@@ -185,10 +164,8 @@
+@@ -185,10 +172,8 @@
    StringRef(IgnoreCallbacks).split(IgnoreCallbacksStrings, ",",
                                     /*MaxSplit=*/ -1, /*KeepEmpty=*/false);
    SmallSet<std::string, 4> Ignore;
@@ -2157,7 +2049,7 @@ Index: pp-trace/PPTrace.cpp
  
    // Create the compilation database.
    SmallString<256> PathBuf;
-@@ -197,14 +174,21 @@
+@@ -197,14 +182,14 @@
    Compilations.reset(
        new FixedCompilationDatabase(Twine(PathBuf), CC1Arguments));
  
@@ -2169,22 +2061,15 @@ Index: pp-trace/PPTrace.cpp
 -  PPTraceFrontendActionFactory Factory(Ignore, CallbackCalls);
 -  int HadErrors = Tool.run(&Factory);
  
-+  CallbackCalls Calls = VerboseMode ? CallbackCallsVerbose(Ignore) : CallbackCalls(Ignore);
++  auto Calls = CallbackCalls(Ignore);
 +
-+  int HadErrors = 0;
-+  if (VerboseMode) {
-+	  PPTraceFrontendActionFactory<PPCallbacksVerbose> Factory(Calls);
-+	  HadErrors = Tool.run(&Factory);
-+  }
-+  else {
-+	  PPTraceFrontendActionFactory<PPCallbacksTracker> Factory(Calls);
-+	  HadErrors = Tool.run(&Factory);
-+  }
++	PPTraceFrontendActionFactory Factory(Calls, VerboseMode);
++  auto HadErrors = Tool.run(&Factory);
 +
    // If we had errors, exit early.
    if (HadErrors)
      return HadErrors;
-@@ -211,7 +195,7 @@
+@@ -211,7 +196,7 @@
  
    // Do the output.
    if (!OutputFileName.size()) {
@@ -2193,7 +2078,7 @@ Index: pp-trace/PPTrace.cpp
    } else {
      // Set up output file.
      std::error_code EC;
-@@ -222,7 +206,7 @@
+@@ -222,7 +207,7 @@
        return 1;
      }
  
@@ -2288,6 +2173,111 @@ Index: pp-trace/Utils.h
 +}
 +
 +#endif // PPTRACE_UTILS_H
+Index: pp-trace/VerboseDecorator.cpp
+===================================================================
+--- pp-trace/VerboseDecorator.cpp	(nonexistent)
++++ pp-trace/VerboseDecorator.cpp	(working copy)
+@@ -0,0 +1,71 @@
++#include "VerboseDecorator.h"
++#include <numeric>
++
++using namespace llvm;
++using namespace clang;
++
++VerboseDecorator::VerboseDecorator(CallbackCalls& CallbackCalls,
++	                                   clang::Preprocessor & PP,
++                                     std::unique_ptr<PPCallbacksTracker> Tracker)
++	: PPCallbacksTracker(CallbackCalls, PP),
++    Tracker(std::move(Tracker)), 
++    PP(PP) {
++  llvm::outs() << "VerboseDecorator CTOR\n";
++}
++
++
++VerboseDecorator::VerboseDecorator(VerboseDecorator&& o)
++  : PPCallbacksTracker(o.Tracker->GetCalls(), o.PP),
++    Tracker(std::move(o.Tracker)),
++    PP(o.PP) {
++
++  llvm::outs() << "VerboseDecorator MOVE CTOR\n";
++}
++
++VerboseDecorator& VerboseDecorator::operator=(VerboseDecorator&& o) {
++  llvm::outs() << "VerboseDecorator MOVE ASSIGN\n";
++  if (this != &o) {
++    Tracker.release();
++    Tracker = std::move(o.Tracker);
++  }
++
++  return *this;
++}
++
++void VerboseDecorator::MacroExpands(const clang::Token &MacroNameTok,
++	const clang::MacroDefinition &MD, clang::SourceRange Range,
++	const clang::MacroArgs *Args) {
++	Tracker->MacroExpands(MacroNameTok, MD, Range, Args);
++
++  const auto DefBody = MD.getMacroInfo()->tokens();
++  auto RawDefBody = std::vector<std::string>(DefBody.size());
++
++  for (const auto& t : DefBody) {
++    auto Begin = getCharacterData(PP, t.getLocation());
++    const auto tok = StringRef(Begin, t.getLength());
++    RawDefBody.push_back(tok);
++  }
++
++  for (const auto &CurrArg : *Tracker->GetCurrentArgs()) {
++    for (auto &BodyToken : RawDefBody) {
++      if (std::get<0>(CurrArg).compare(BodyToken) == 0) {
++        auto ArgTokens = &std::get<1>(CurrArg);
++        BodyToken =
++          std::accumulate(ArgTokens->cbegin(), ArgTokens->cend(), std::string(""));
++      }
++    }
++  }
++
++	Tracker.get()->GetCalls().appendArgument("ExpandedTokens",
++    std::accumulate(RawDefBody.begin(),RawDefBody.end(), std::string("")));
++}
++
++void VerboseDecorator::MacroDefined(const clang::Token &MacroNameTok,
++	const clang::MacroDirective *MD) {
++  Tracker->MacroDefined(MacroNameTok, MD);
++
++	const auto likeness = MD->getDefinition().getMacroInfo()->isObjectLike();
++	Tracker->GetCalls().appendArgument("Likeness",
++		likeness ? "Object" : "Function");
++	Tracker->GetCalls().appendArgument("Loc", MD->getLocation(), PP);
++}
+Index: pp-trace/VerboseDecorator.h
+===================================================================
+--- pp-trace/VerboseDecorator.h	(nonexistent)
++++ pp-trace/VerboseDecorator.h	(working copy)
+@@ -0,0 +1,23 @@
++#include "PPCallbacksTracker.h"
++
++class VerboseDecorator : public PPCallbacksTracker {
++public:
++	VerboseDecorator(CallbackCalls& CallbackCalls,
++		clang::Preprocessor &PP, std::unique_ptr<PPCallbacksTracker> Tracker);
++  VerboseDecorator(VerboseDecorator&& o);
++  VerboseDecorator& operator=(VerboseDecorator&& o);
++
++  ~VerboseDecorator() { llvm::outs() << "VerboseDecorator DTOR\n"; }
++
++	void MacroExpands(const clang::Token &MacroNameTok,
++		const clang::MacroDefinition &MD, clang::SourceRange Range,
++		const clang::MacroArgs *Args) override;
++	void MacroDefined(const clang::Token &MacroNameTok,
++		const clang::MacroDirective *MD) override;
++
++private:
++
++  clang::Preprocessor &PP;
++  std::unique_ptr<PPCallbacksTracker> Tracker = nullptr;
++
++};
+\ No newline at end of file
 Index: test/pp-trace/pp-trace-macro.cpp
 ===================================================================
 --- test/pp-trace/pp-trace-macro.cpp	(revision 302379)
