@@ -6,34 +6,34 @@ Index: pp-trace/ArgTokens.cpp
 +#include "ArgTokens.h"
 +
 +void ArgTokens::Init(const MacroDefinition &MD,
-+  const clang::MacroArgs *ActArgs, clang::Preprocessor& PP) {
++    const clang::MacroArgs *ActArgs, clang::Preprocessor& PP) {
 +
-+  if (!ActArgs) {
-+    return;
-+  }
++    if (!ActArgs) {
++        return;
++    }
 +
-+	if (IsInitialized()) {
-+		Destroy();
-+	}
++    if (IsInitialized()) {
++        Destroy();
++    }
 +
-+  const auto DefArgs = MD.getMacroInfo()->args();
++    const auto DefArgs = MD.getMacroInfo()->args();
 +
-+	for (auto I = 0u, E = ActArgs->getNumArguments(); I < E; ++I) {
-+		auto Current = ActArgs->getUnexpArgument(I);
-+		auto TokenCount = ActArgs->getArgLength(Current) + 1;
-+		E -= TokenCount;
-+		--TokenCount;
++    for (auto I = 0u, E = ActArgs->getNumArguments(); I < E; ++I) {
++        auto Current = ActArgs->getUnexpArgument(I);
++        auto TokenCount = ActArgs->getArgLength(Current) + 1;
++        E -= TokenCount;
++        --TokenCount;
 +
-+    Cache.push_back(std::make_tuple(DefArgs[I]->getName(),
++        Cache.push_back(std::make_tuple(DefArgs[I]->getName(),
 +        std::tuple_element<1, decltype(Cache)::value_type>::type()));
-+		for (auto TokenIndex = 0u; TokenIndex < TokenCount; ++TokenIndex, ++Current) {
-+				std::get<1>(Cache.back()).push_back(PP.getSpelling(*Current));
-+		}
-+	}
++        for (auto TokenIndex = 0u; TokenIndex < TokenCount; ++TokenIndex, ++Current) {
++            std::get<1>(Cache.back()).push_back(PP.getSpelling(*Current));
++        }
++    }
 +}
 +
 +void ArgTokens::Destroy() {
-+	Cache.clear();
++    Cache.clear();
 +}
 +
 Index: pp-trace/ArgTokens.h
@@ -54,36 +54,35 @@ Index: pp-trace/ArgTokens.h
 +class ArgTokens {
 +private:
 +
-+  // A vector of tuples of strings(definition arg) and vectors of (actual args)
-+	std::vector<
-+    std::tuple<
-+      std::string,
-+      std::vector<std::string>
-+    >
-+  > Cache;
++    // A vector of tuples of strings(parameter) and vectors of (actual args)
++    std::vector<
++        std::tuple<
++            std::string,
++            std::vector<std::string>
++        >
++    > Cache;
 +
 +public:
 +
-+	void Init(const MacroDefinition &MacroDefinition, const MacroArgs *ActualArgs,
++    void Init(const MacroDefinition &MacroDefinition, const MacroArgs *ActualArgs,
 +    Preprocessor& PP);
 +
-+	auto begin() const { return Cache.cbegin(); }
-+	auto end() const { return Cache.cend(); }
-+  auto size() const { return Cache.size(); }
++    decltype(Cache.cbegin()) begin() const { return Cache.cbegin(); }
++    decltype(Cache.cend()) end() const { return Cache.cend(); }
++    decltype(Cache.size()) size() const { return Cache.size(); }
 +
-+  auto IsInitialized() const { return !Cache.empty(); }
++    bool IsInitialized() const { return !Cache.empty(); }
 +
-+	void Destroy();
++    void Destroy();
 +};
 +
 +
 +#endif // PPTRACE_ARGTOKENS_H
-\ No newline at end of file
 Index: pp-trace/CallbackCall.h
 ===================================================================
 --- pp-trace/CallbackCall.h	(nonexistent)
 +++ pp-trace/CallbackCall.h	(working copy)
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,118 @@
 +#ifndef PPTRACE_CALLBACKCALL_H
 +#define PPTRACE_CALLBACKCALL_H
 +
@@ -99,113 +98,114 @@ Index: pp-trace/CallbackCall.h
 +/// \brief This class represents one callback function argument by name
 +///   and value.
 +struct Argument {
-+  std::string Name;
-+  std::string Value;
++    std::string Name;
++    std::string Value;
 +};
 +
 +/// \brief This class represents one callback call by name and an array
 +///   of arguments.
 +class CallbackCall {
 +public:
-+  CallbackCall(llvm::StringRef Name) : Name(Name) {}
-+  CallbackCall() = default;
++    CallbackCall(llvm::StringRef Name) : Name(Name) {}
++    CallbackCall() = default;
 +
-+  std::string Name;
-+  std::vector<Argument> Arguments;
++    std::string Name;
++    std::vector<Argument> Arguments;
 +};
 +
 +class CallbackCalls {
++private:
++
++    /// \brief Callback trace information.
++    /// We use a reference so the trace will be preserved for the caller
++    /// after this object is destructed.
++    std::vector<CallbackCall> Calls;
 +
 +public:
-+	CallbackCalls(llvm::SmallSet<std::string, 4> &Ignore);
-+	virtual ~CallbackCalls() {}
++    CallbackCalls(llvm::SmallSet<std::string, 4> &Ignore);
++    virtual ~CallbackCalls() {}
 +
-+	auto begin() const { return Calls.cbegin(); }
-+	auto end() const { return Calls.cend(); }
++    decltype(Calls.cbegin()) begin() const { return Calls.cbegin(); }
++    decltype(Calls.cend()) end() const { return Calls.cend(); }
 +
-+	/// \brief Start a new callback.
-+	void beginCallback(const char *Name);
++    /// \brief Start a new callback.
++    void beginCallback(const char *Name);
 +
-+	/// \brief Append a bool argument to the top trace item.
-+	virtual void appendArgument(const char *Name, bool Value);
++    /// \brief Append a bool argument to the top trace item.
++    virtual void appendArgument(const char *Name, bool Value);
 +
-+	/// \brief Append an int argument to the top trace item.
-+	virtual void appendArgument(const char *Name, int Value);
++    /// \brief Append an int argument to the top trace item.
++    virtual void appendArgument(const char *Name, int Value);
 +
-+	/// \brief Append a string argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const char *Value);
++    /// \brief Append a string argument to the top trace item.
++    virtual void appendArgument(const char *Name, const char *Value);
 +
-+	/// \brief Append a string reference object argument to the top trace item.
-+	virtual void appendArgument(const char *Name, llvm::StringRef Value);
++    /// \brief Append a string reference object argument to the top trace item.
++    virtual void appendArgument(const char *Name, llvm::StringRef Value);
 +
-+	/// \brief Append a string object argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const std::string &Value);
++    /// \brief Append a string object argument to the top trace item.
++    virtual void appendArgument(const char *Name, const std::string &Value);
 +
-+	/// \brief Append a token argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::Token &Value, clang::Preprocessor& PP);
++    /// \brief Append a token argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::Token &Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append an enum argument to the top trace item.
-+	virtual void appendArgument(const char *Name, int Value, const char *const Strings[]);
++    /// \brief Append an enum argument to the top trace item.
++    virtual void appendArgument(const char *Name, int Value, const char *const Strings[]);
 +
-+	/// \brief Append a FileID argument to the top trace item.
-+	virtual void appendArgument(const char *Name, clang::FileID Value, clang::Preprocessor& PP);
++    /// \brief Append a FileID argument to the top trace item.
++    virtual void appendArgument(const char *Name, clang::FileID Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append a FileEntry argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::FileEntry *Value);
++    /// \brief Append a FileEntry argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::FileEntry *Value);
 +
-+	/// \brief Append a SourceLocation argument to the top trace item.
-+	virtual void appendArgument(const char *Name, clang::SourceLocation Value, clang::Preprocessor& PP);
++    /// \brief Append a SourceLocation argument to the top trace item.
++    virtual void appendArgument(const char *Name, clang::SourceLocation Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append a SourceRange argument to the top trace item.
-+	virtual void appendArgument(const char *Name, clang::SourceRange Value, clang::Preprocessor& PP);
++    /// \brief Append a SourceRange argument to the top trace item.
++    virtual void appendArgument(const char *Name, clang::SourceRange Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append a CharSourceRange argument to the top trace item.
-+	virtual void appendArgument(const char *Name, clang::CharSourceRange Value, clang::Preprocessor& PP);
++    /// \brief Append a CharSourceRange argument to the top trace item.
++    virtual void appendArgument(const char *Name, clang::CharSourceRange Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append a ModuleIdPath argument to the top trace item.
-+	virtual void appendArgument(const char *Name, clang::ModuleIdPath Value, clang::Preprocessor& PP);
++    /// \brief Append a ModuleIdPath argument to the top trace item.
++    virtual void appendArgument(const char *Name, clang::ModuleIdPath Value, clang::Preprocessor& PP);
 +
-+	/// \brief Append an IdentifierInfo argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::IdentifierInfo *Value);
++    /// \brief Append an IdentifierInfo argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::IdentifierInfo *Value);
 +
-+	/// \brief Append a MacroDirective argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::MacroDirective *Value);
++    /// \brief Append a MacroDirective argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::MacroDirective *Value);
 +
-+	/// \brief Append a MacroDefinition argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::MacroDefinition &Value);
++    /// \brief Append a MacroDefinition argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::MacroDefinition &Value);
 +
-+	/// \brief Append a Module argument to the top trace item.
-+	virtual void appendArgument(const char *Name, const clang::Module *Value);
++    /// \brief Append a Module argument to the top trace item.
++    virtual void appendArgument(const char *Name, const clang::Module *Value);
 +
-+  virtual void appendArgument(const char *Name, const ArgTokens *Args);
++    /// \brief Append an ArgTokens argument to the top trace item.
++    virtual void appendArgument(const char *Name, const ArgTokens *Args);
 +
-+	/// \brief Append a double-quoted argument to the top trace item.
-+	void appendQuotedArgument(const char *Name, const std::string &Value);
++    /// \brief Append a double-quoted argument to the top trace item.
++    void appendQuotedArgument(const char *Name, const std::string &Value);
 +
-+	/// \brief Append a double-quoted file path argument to the top trace item.
-+	void appendFilePathArgument(const char *Name, llvm::StringRef Value);
++    /// \brief Append a double-quoted file path argument to the top trace item.
++    void appendFilePathArgument(const char *Name, llvm::StringRef Value);
 +
 +private:
 +
-+  /// \brief Inhibit trace while this is set.
-+  bool DisableTrace;
++    /// \brief Inhibit trace while this is set.
++    bool DisableTrace;
 +
-+	/// \brief Callback trace information.
-+	/// We use a reference so the trace will be preserved for the caller
-+	/// after this object is destructed.
-+	std::vector<CallbackCall> Calls;
-+
-+	/// \brief Names of callbacks to ignore.
-+	llvm::SmallSet<std::string, 4> &Ignore;
++    /// \brief Names of callbacks to ignore.
++    llvm::SmallSet<std::string, 4> &Ignore;
 +};
 +
-+#endif PPTRACE_CALLBACKCALL_H // PPTRACE_CALLBACKCALL_H
-\ No newline at end of file
++#endif // PPTRACE_CALLBACKCALL_H
 Index: pp-trace/CallbackCalls.cpp
 ===================================================================
 --- pp-trace/CallbackCalls.cpp	(nonexistent)
 +++ pp-trace/CallbackCalls.cpp	(working copy)
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,235 @@
 +#include "CallbackCall.h"
 +#include "Utils.h"
 +#include "clang/Lex/Preprocessor.h"
@@ -221,224 +221,226 @@ Index: pp-trace/CallbackCalls.cpp
 +
 +// Start a new callback.
 +void CallbackCalls::beginCallback(const char *Name) {
-+  DisableTrace = Ignore.count(std::string(Name));
-+  if (DisableTrace)
-+    return;
-+  Calls.push_back(CallbackCall(Name));
++    DisableTrace = Ignore.count(std::string(Name));
++    if (DisableTrace)
++        return;
++    Calls.push_back(CallbackCall(Name));
 +}
 +
 +// Append a bool argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, bool Value) {
-+  appendArgument(Name, (Value ? "true" : "false"));
++    appendArgument(Name, (Value ? "true" : "false"));
 +}
 +
 +// Append an int argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, int Value) {
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << Value;
-+  appendArgument(Name, SS.str());
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
++    SS << Value;
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append a string argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, const char *Value) {
-+  if (DisableTrace)
-+    return;
-+  Calls.back().Arguments.push_back(Argument{ Name, Value });
++    if (DisableTrace)
++        return;
++    Calls.back().Arguments.push_back(Argument{ Name, Value });
 +}
 +
 +// Append a string object argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        llvm::StringRef Value) {
-+  appendArgument(Name, Value.str());
++    appendArgument(Name, Value.str());
 +}
 +
 +// Append a string object argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const std::string &Value) {
-+  appendArgument(Name, Value.c_str());
++    appendArgument(Name, Value.c_str());
 +}
 +
 +// Append a token argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::Token &Value,
 +										clang::Preprocessor& PP) {
-+  appendArgument(Name, PP.getSpelling(Value));
++    appendArgument(Name, PP.getSpelling(Value));
 +}
 +
 +// Append an enum argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, int Value,
 +                                        const char *const Strings[]) {
-+  appendArgument(Name, Strings[Value]);
++    appendArgument(Name, Strings[Value]);
 +}
 +
 +// Append a FileID argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, clang::FileID Value,
 +										clang::Preprocessor& PP) {
-+  if (Value.isInvalid()) {
-+    appendArgument(Name, "(invalid)");
-+    return;
-+  }
-+  const clang::FileEntry *FileEntry =
++    if (Value.isInvalid()) {
++        appendArgument(Name, "(invalid)");
++        return;
++    }
++    const clang::FileEntry *FileEntry =
 +      PP.getSourceManager().getFileEntryForID(Value);
-+  if (!FileEntry) {
-+    appendArgument(Name, "(getFileEntryForID failed)");
-+    return;
-+  }
-+  appendFilePathArgument(Name, FileEntry->getName());
++    if (!FileEntry) {
++        appendArgument(Name, "(getFileEntryForID failed)");
++        return;
++    }
++    appendFilePathArgument(Name, FileEntry->getName());
 +}
 +
 +// Append a FileEntry argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::FileEntry *Value) {
-+  if (!Value) {
-+    appendArgument(Name, "(null)");
-+    return;
-+  }
-+  appendFilePathArgument(Name, Value->getName());
++    if (!Value) {
++        appendArgument(Name, "(null)");
++        return;
++    }
++    appendFilePathArgument(Name, Value->getName());
 +}
 +
 +// Append a SourceLocation argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        clang::SourceLocation Value,
 +										clang::Preprocessor& PP) {
-+  if (Value.isInvalid()) {
-+    appendArgument(Name, "(invalid)");
-+    return;
-+  }
-+  appendArgument(Name, getSourceLocationString(PP, Value).c_str());
++    if (Value.isInvalid()) {
++        appendArgument(Name, "(invalid)");
++        return;
++    }
++    appendArgument(Name, getSourceLocationString(PP, Value).c_str());
 +}
 +
 +// Append a SourceRange argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        clang::SourceRange Value,
 +										clang::Preprocessor& PP) {
-+  if (DisableTrace)
-+    return;
-+  if (Value.isInvalid()) {
-+    appendArgument(Name, "(invalid)");
-+    return;
-+  }
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << "[" << getSourceLocationString(PP, Value.getBegin()) << ", "
-+     << getSourceLocationString(PP, Value.getEnd()) << "]";
-+  appendArgument(Name, SS.str());
++    if (DisableTrace)
++        return;
++    if (Value.isInvalid()) {
++        appendArgument(Name, "(invalid)");
++        return;
++    }
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
++    SS << "[" << getSourceLocationString(PP, Value.getBegin()) << ", "
++        << getSourceLocationString(PP, Value.getEnd()) << "]";
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append a CharSourceRange argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        clang::CharSourceRange Value,
 +										clang::Preprocessor& PP) {
-+  if (Value.isInvalid()) {
-+    appendArgument(Name, "(invalid)");
-+    return;
-+  }
-+  appendArgument(Name, getSourceString<clang::CharSourceRange>(PP, Value).str().c_str());
++    if (Value.isInvalid()) {
++        appendArgument(Name, "(invalid)");
++        return;
++    }
++    appendArgument(Name, getSourceString<clang::CharSourceRange>(PP, Value).str().c_str());
 +}
 +
 +// Append a SourceLocation argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        clang::ModuleIdPath Value,
 +										clang::Preprocessor& PP) {
-+  if (DisableTrace)
-+    return;
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << "[";
-+  for (int I = 0, E = Value.size(); I != E; ++I) {
-+    if (I)
-+      SS << ", ";
-+    SS << "{"
-+       << "Name: " << Value[I].first->getName() << ", "
-+       << "Loc: " << getSourceLocationString(PP, Value[I].second) << "}";
-+  }
-+  SS << "]";
-+  appendArgument(Name, SS.str());
++    if (DisableTrace)
++        return;
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
++    SS << "[";
++    for (int I = 0, E = Value.size(); I != E; ++I) {
++        if (I)
++          SS << ", ";
++        SS << "{"
++           << "Name: " << Value[I].first->getName() << ", "
++           << "Loc: " << getSourceLocationString(PP, Value[I].second) << "}";
++    }
++    SS << "]";
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append an IdentifierInfo argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::IdentifierInfo *Value) {
-+  if (!Value) {
-+    appendArgument(Name, "(null)");
-+    return;
-+  }
-+  appendArgument(Name, Value->getName().str().c_str());
++    if (!Value) {
++        appendArgument(Name, "(null)");
++        return;
++    }
++    appendArgument(Name, Value->getName().str().c_str());
 +}
 +
 +// Append a MacroDirective argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::MacroDirective *Value) {
-+  if (!Value) {
-+    appendArgument(Name, "(null)");
-+    return;
-+  }
-+  appendArgument(Name, MacroDirectiveKindStrings[Value->getKind()]);
++    if (!Value) {
++        appendArgument(Name, "(null)");
++        return;
++    }
++    appendArgument(Name, MacroDirectiveKindStrings[Value->getKind()]);
 +}
 +
 +// Append a MacroDefinition argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::MacroDefinition &Value) {
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << "[";
-+  bool Any = false;
-+  if (Value.getLocalDirective()) {
-+    SS << "(local)";
-+    Any = true;
-+  }
-+  for (auto *MM : Value.getModuleMacros()) {
-+    if (Any) SS << ", ";
-+    SS << MM->getOwningModule()->getFullModuleName();
-+  }
-+  SS << "]";
-+  appendArgument(Name, SS.str());
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
++    SS << "[";
++    bool Any = false;
++    if (Value.getLocalDirective()) {
++        SS << "(local)";
++        Any = true;
++    }
++    for (auto *MM : Value.getModuleMacros()) {
++        if (Any)
++            SS << ", ";
++        SS << MM->getOwningModule()->getFullModuleName();
++    }
++    SS << "]";
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append a Module argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name,
 +                                        const clang::Module *Value) {
-+  if (!Value) {
-+    appendArgument(Name, "(null)");
-+    return;
-+  }
-+  appendArgument(Name, Value->Name.c_str());
++    if (!Value) {
++        appendArgument(Name, "(null)");
++        return;
++    }
++    appendArgument(Name, Value->Name.c_str());
 +}
 +
++// Append an ArgTokens argument to the top trace item.
 +void CallbackCalls::appendArgument(const char *Name, const ArgTokens *Args) {
-+  std::string s;
-+  llvm::raw_string_ostream SS(s);
-+  for (const auto& arg : *Args) {
-+    SS << "\n  - ";
-+    SS << std::get<0>(arg) << ": ";
-+    const auto& subargs = std::get<1>(arg);
-+    for (auto subarg = subargs.cbegin(); subarg < subargs.cend(); ++subarg) {
-+      SS << *subarg;
-+    }
-+  }
++    std::string s;
++    llvm::raw_string_ostream SS(s);
++    for (const auto& arg : *Args) {
++        SS << "\n  - ";
++        SS << std::get<0>(arg) << ": ";
++        const auto& subargs = std::get<1>(arg);
 +
-+  appendArgument(Name, SS.str());
++        for (auto subarg = subargs.cbegin(); subarg < subargs.cend(); ++subarg) {
++            SS << *subarg;
++        }
++    }
++
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append a double-quoted argument to the top trace item.
 +void CallbackCalls::appendQuotedArgument(const char *Name,
 +                                              const std::string &Value) {
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << "\"" << Value << "\"";
-+  appendArgument(Name, SS.str());
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
++    SS << "\"" << Value << "\"";
++    appendArgument(Name, SS.str());
 +}
 +
 +// Append a double-quoted file path argument to the top trace item.
 +void CallbackCalls::appendFilePathArgument(const char *Name,
 +                                                llvm::StringRef Value) {
-+  std::string Path(Value);
-+  // YAML treats backslash as escape, so use forward slashes.
-+  std::replace(Path.begin(), Path.end(), '\\', '/');
-+  appendQuotedArgument(Name, Path);
++    std::string Path(Value);
++    // YAML treats backslash as escape, so use forward slashes.
++    std::replace(Path.begin(), Path.end(), '\\', '/');
++    appendQuotedArgument(Name, Path);
 +}
-\ No newline at end of file
 Index: pp-trace/CMakeLists.txt
 ===================================================================
 --- pp-trace/CMakeLists.txt	(revision 302379)
@@ -457,29 +459,15 @@ Index: pp-trace/PPCallbacksTracker.cpp
 ===================================================================
 --- pp-trace/PPCallbacksTracker.cpp	(revision 302379)
 +++ pp-trace/PPCallbacksTracker.cpp	(working copy)
-@@ -1,654 +1,395 @@
--//===--- PPCallbacksTracker.cpp - Preprocessor tracker -*--*---------------===//
--//
--//                     The LLVM Compiler Infrastructure
--//
--// This file is distributed under the University of Illinois Open Source
--// License. See LICENSE.TXT for details.
--//
--//===----------------------------------------------------------------------===//
--///
--/// \file
--/// \brief Implementations for preprocessor tracking.
--///
--/// See the header for details.
--///
--//===----------------------------------------------------------------------===//
--
--#include "PPCallbacksTracker.h"
+@@ -15,42 +15,9 @@
+ //===----------------------------------------------------------------------===//
+ 
+ #include "PPCallbacksTracker.h"
 -#include "clang/Lex/MacroArgs.h"
--#include "llvm/Support/raw_ostream.h"
--
+ #include "llvm/Support/raw_ostream.h"
+ 
 -// Utility functions.
--
+ 
 -// Get a "file:line:column" source location string.
 -static std::string getSourceLocationString(clang::Preprocessor &PP,
 -                                           clang::SourceLocation Loc) {
@@ -511,340 +499,35 @@ Index: pp-trace/PPCallbacksTracker.cpp
 -  return std::string("(nonfile)");
 -}
 -
--// Enum string tables.
--
--// FileChangeReason strings.
--static const char *const FileChangeReasonStrings[] = {
--  "EnterFile", "ExitFile", "SystemHeaderPragma", "RenameFile"
--};
--
--// CharacteristicKind strings.
--static const char *const CharacteristicKindStrings[] = { "C_User", "C_System",
--                                                         "C_ExternCSystem" };
--
+ // Enum string tables.
+ 
+ // FileChangeReason strings.
+@@ -62,10 +29,6 @@
+ static const char *const CharacteristicKindStrings[] = { "C_User", "C_System",
+                                                          "C_ExternCSystem" };
+ 
 -// MacroDirective::Kind strings.
 -static const char *const MacroDirectiveKindStrings[] = {
 -  "MD_Define","MD_Undefine", "MD_Visibility"
 -};
--
--// PragmaIntroducerKind strings.
--static const char *const PragmaIntroducerKindStrings[] = { "PIK_HashPragma",
--                                                           "PIK__Pragma",
--                                                           "PIK___pragma" };
--
--// PragmaMessageKind strings.
--static const char *const PragmaMessageKindStrings[] = {
--  "PMK_Message", "PMK_Warning", "PMK_Error"
--};
--
--// ConditionValueKind strings.
--static const char *const ConditionValueKindStrings[] = {
--  "CVK_NotEvaluated", "CVK_False", "CVK_True"
--};
--
--// Mapping strings.
--static const char *const MappingStrings[] = { "0",          "MAP_IGNORE",
--                                              "MAP_REMARK", "MAP_WARNING",
--                                              "MAP_ERROR",  "MAP_FATAL" };
--
--// PPCallbacksTracker functions.
--
+ 
+ // PragmaIntroducerKind strings.
+ static const char *const PragmaIntroducerKindStrings[] = { "PIK_HashPragma",
+@@ -89,13 +52,25 @@
+ 
+ // PPCallbacksTracker functions.
+ 
 -PPCallbacksTracker::PPCallbacksTracker(llvm::SmallSet<std::string, 4> &Ignore,
 -                                       std::vector<CallbackCall> &CallbackCalls,
--                                       clang::Preprocessor &PP)
--    : CallbackCalls(CallbackCalls), Ignore(Ignore), PP(PP) {}
--
--PPCallbacksTracker::~PPCallbacksTracker() {}
--
--// Callback functions.
--
--// Callback invoked whenever a source file is entered or exited.
--void PPCallbacksTracker::FileChanged(
--    clang::SourceLocation Loc, clang::PPCallbacks::FileChangeReason Reason,
--    clang::SrcMgr::CharacteristicKind FileType, clang::FileID PrevFID) {
--  beginCallback("FileChanged");
--  appendArgument("Loc", Loc);
--  appendArgument("Reason", Reason, FileChangeReasonStrings);
--  appendArgument("FileType", FileType, CharacteristicKindStrings);
--  appendArgument("PrevFID", PrevFID);
--}
--
--// Callback invoked whenever a source file is skipped as the result
--// of header guard optimization.
--void
--PPCallbacksTracker::FileSkipped(const clang::FileEntry &SkippedFile,
--                                const clang::Token &FilenameTok,
--                                clang::SrcMgr::CharacteristicKind FileType) {
--  beginCallback("FileSkipped");
--  appendArgument("ParentFile", &SkippedFile);
--  appendArgument("FilenameTok", FilenameTok);
--  appendArgument("FileType", FileType, CharacteristicKindStrings);
--}
--
--// Callback invoked whenever an inclusion directive results in a
--// file-not-found error.
--bool
--PPCallbacksTracker::FileNotFound(llvm::StringRef FileName,
--                                 llvm::SmallVectorImpl<char> &RecoveryPath) {
--  beginCallback("FileNotFound");
--  appendFilePathArgument("FileName", FileName);
--  return false;
--}
--
--// Callback invoked whenever an inclusion directive of
--// any kind (#include, #import, etc.) has been processed, regardless
--// of whether the inclusion will actually result in an inclusion.
--void PPCallbacksTracker::InclusionDirective(
--    clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
--    llvm::StringRef FileName, bool IsAngled,
--    clang::CharSourceRange FilenameRange, const clang::FileEntry *File,
--    llvm::StringRef SearchPath, llvm::StringRef RelativePath,
--    const clang::Module *Imported) {
--  beginCallback("InclusionDirective");
--  appendArgument("IncludeTok", IncludeTok);
--  appendFilePathArgument("FileName", FileName);
--  appendArgument("IsAngled", IsAngled);
--  appendArgument("FilenameRange", FilenameRange);
--  appendArgument("File", File);
--  appendFilePathArgument("SearchPath", SearchPath);
--  appendFilePathArgument("RelativePath", RelativePath);
--  appendArgument("Imported", Imported);
--}
--
--// Callback invoked whenever there was an explicit module-import
--// syntax.
--void PPCallbacksTracker::moduleImport(clang::SourceLocation ImportLoc,
--                                      clang::ModuleIdPath Path,
--                                      const clang::Module *Imported) {
--  beginCallback("moduleImport");
--  appendArgument("ImportLoc", ImportLoc);
--  appendArgument("Path", Path);
--  appendArgument("Imported", Imported);
--}
--
--// Callback invoked when the end of the main file is reached.
--// No subsequent callbacks will be made.
--void PPCallbacksTracker::EndOfMainFile() { beginCallback("EndOfMainFile"); }
--
--// Callback invoked when a #ident or #sccs directive is read.
--void PPCallbacksTracker::Ident(clang::SourceLocation Loc, llvm::StringRef Str) {
--  beginCallback("Ident");
--  appendArgument("Loc", Loc);
--  appendArgument("Str", Str);
--}
--
--// Callback invoked when start reading any pragma directive.
--void
--PPCallbacksTracker::PragmaDirective(clang::SourceLocation Loc,
--                                    clang::PragmaIntroducerKind Introducer) {
--  beginCallback("PragmaDirective");
--  appendArgument("Loc", Loc);
--  appendArgument("Introducer", Introducer, PragmaIntroducerKindStrings);
--}
--
--// Callback invoked when a #pragma comment directive is read.
--void PPCallbacksTracker::PragmaComment(clang::SourceLocation Loc,
--                                       const clang::IdentifierInfo *Kind,
--                                       llvm::StringRef Str) {
--  beginCallback("PragmaComment");
--  appendArgument("Loc", Loc);
--  appendArgument("Kind", Kind);
--  appendArgument("Str", Str);
--}
--
--// Callback invoked when a #pragma detect_mismatch directive is
--// read.
--void PPCallbacksTracker::PragmaDetectMismatch(clang::SourceLocation Loc,
--                                              llvm::StringRef Name,
--                                              llvm::StringRef Value) {
--  beginCallback("PragmaDetectMismatch");
--  appendArgument("Loc", Loc);
--  appendArgument("Name", Name);
--  appendArgument("Value", Value);
--}
--
--// Callback invoked when a #pragma clang __debug directive is read.
--void PPCallbacksTracker::PragmaDebug(clang::SourceLocation Loc,
--                                     llvm::StringRef DebugType) {
--  beginCallback("PragmaDebug");
--  appendArgument("Loc", Loc);
--  appendArgument("DebugType", DebugType);
--}
--
--// Callback invoked when a #pragma message directive is read.
--void PPCallbacksTracker::PragmaMessage(
--    clang::SourceLocation Loc, llvm::StringRef Namespace,
--    clang::PPCallbacks::PragmaMessageKind Kind, llvm::StringRef Str) {
--  beginCallback("PragmaMessage");
--  appendArgument("Loc", Loc);
--  appendArgument("Namespace", Namespace);
--  appendArgument("Kind", Kind, PragmaMessageKindStrings);
--  appendArgument("Str", Str);
--}
--
--// Callback invoked when a #pragma gcc dianostic push directive
--// is read.
--void PPCallbacksTracker::PragmaDiagnosticPush(clang::SourceLocation Loc,
--                                              llvm::StringRef Namespace) {
--  beginCallback("PragmaDiagnosticPush");
--  appendArgument("Loc", Loc);
--  appendArgument("Namespace", Namespace);
--}
--
--// Callback invoked when a #pragma gcc dianostic pop directive
--// is read.
--void PPCallbacksTracker::PragmaDiagnosticPop(clang::SourceLocation Loc,
--                                             llvm::StringRef Namespace) {
--  beginCallback("PragmaDiagnosticPop");
--  appendArgument("Loc", Loc);
--  appendArgument("Namespace", Namespace);
--}
--
--// Callback invoked when a #pragma gcc dianostic directive is read.
--void PPCallbacksTracker::PragmaDiagnostic(clang::SourceLocation Loc,
--                                          llvm::StringRef Namespace,
--                                          clang::diag::Severity Mapping,
--                                          llvm::StringRef Str) {
--  beginCallback("PragmaDiagnostic");
--  appendArgument("Loc", Loc);
--  appendArgument("Namespace", Namespace);
--  appendArgument("Mapping", (unsigned)Mapping, MappingStrings);
--  appendArgument("Str", Str);
--}
--
--// Called when an OpenCL extension is either disabled or
--// enabled with a pragma.
--void PPCallbacksTracker::PragmaOpenCLExtension(
--    clang::SourceLocation NameLoc, const clang::IdentifierInfo *Name,
--    clang::SourceLocation StateLoc, unsigned State) {
--  beginCallback("PragmaOpenCLExtension");
--  appendArgument("NameLoc", NameLoc);
--  appendArgument("Name", Name);
--  appendArgument("StateLoc", StateLoc);
--  appendArgument("State", (int)State);
--}
--
--// Callback invoked when a #pragma warning directive is read.
--void PPCallbacksTracker::PragmaWarning(clang::SourceLocation Loc,
--                                       llvm::StringRef WarningSpec,
--                                       llvm::ArrayRef<int> Ids) {
--  beginCallback("PragmaWarning");
--  appendArgument("Loc", Loc);
--  appendArgument("WarningSpec", WarningSpec);
--
--  std::string Str;
--  llvm::raw_string_ostream SS(Str);
--  SS << "[";
--  for (int i = 0, e = Ids.size(); i != e; ++i) {
--    if (i)
--      SS << ", ";
--    SS << Ids[i];
--  }
--  SS << "]";
--  appendArgument("Ids", SS.str());
--}
--
--// Callback invoked when a #pragma warning(push) directive is read.
--void PPCallbacksTracker::PragmaWarningPush(clang::SourceLocation Loc,
--                                           int Level) {
--  beginCallback("PragmaWarningPush");
--  appendArgument("Loc", Loc);
--  appendArgument("Level", Level);
--}
--
--// Callback invoked when a #pragma warning(pop) directive is read.
--void PPCallbacksTracker::PragmaWarningPop(clang::SourceLocation Loc) {
--  beginCallback("PragmaWarningPop");
--  appendArgument("Loc", Loc);
--}
--
--// Called by Preprocessor::HandleMacroExpandedIdentifier when a
--// macro invocation is found.
--void
--PPCallbacksTracker::MacroExpands(const clang::Token &MacroNameTok,
--                                 const clang::MacroDefinition &MacroDefinition,
--                                 clang::SourceRange Range,
--                                 const clang::MacroArgs *Args) {
--  beginCallback("MacroExpands");
--  appendArgument("MacroNameTok", MacroNameTok);
--  appendArgument("MacroDefinition", MacroDefinition);
--  appendArgument("Range", Range);
--  appendArgument("Args", Args);
--}
--
--// Hook called whenever a macro definition is seen.
--void
--PPCallbacksTracker::MacroDefined(const clang::Token &MacroNameTok,
--                                 const clang::MacroDirective *MacroDirective) {
--  beginCallback("MacroDefined");
--  appendArgument("MacroNameTok", MacroNameTok);
--  appendArgument("MacroDirective", MacroDirective);
--}
--
--// Hook called whenever a macro #undef is seen.
--void PPCallbacksTracker::MacroUndefined(
--    const clang::Token &MacroNameTok,
-+//===--- PPCallbacksTracker.cpp - Preprocessor tracker -*--*---------------===//
-+//
-+//                     The LLVM Compiler Infrastructure
-+//
-+// This file is distributed under the University of Illinois Open Source
-+// License. See LICENSE.TXT for details.
-+//
-+//===----------------------------------------------------------------------===//
-+///
-+/// \file
-+/// \brief Implementations for preprocessor tracking.
-+///
-+/// See the header for details.
-+///
-+//===----------------------------------------------------------------------===//
-+
-+#include "PPCallbacksTracker.h"
-+#include "llvm/Support/raw_ostream.h"
-+
-+
-+// Enum string tables.
-+
-+// FileChangeReason strings.
-+static const char *const FileChangeReasonStrings[] = {
-+  "EnterFile", "ExitFile", "SystemHeaderPragma", "RenameFile"
-+};
-+
-+// CharacteristicKind strings.
-+static const char *const CharacteristicKindStrings[] = { "C_User", "C_System",
-+                                                         "C_ExternCSystem" };
-+
-+
-+// PragmaIntroducerKind strings.
-+static const char *const PragmaIntroducerKindStrings[] = { "PIK_HashPragma",
-+                                                           "PIK__Pragma",
-+                                                           "PIK___pragma" };
-+
-+// PragmaMessageKind strings.
-+static const char *const PragmaMessageKindStrings[] = {
-+  "PMK_Message", "PMK_Warning", "PMK_Error"
-+};
-+
-+// ConditionValueKind strings.
-+static const char *const ConditionValueKindStrings[] = {
-+  "CVK_NotEvaluated", "CVK_False", "CVK_True"
-+};
-+
-+// Mapping strings.
-+static const char *const MappingStrings[] = { "0",          "MAP_IGNORE",
-+                                              "MAP_REMARK", "MAP_WARNING",
-+                                              "MAP_ERROR",  "MAP_FATAL" };
-+
-+// PPCallbacksTracker functions.
-+
 +PPCallbacksTracker::PPCallbacksTracker(CallbackCalls &CallbackCalls,
-+                                       clang::Preprocessor &PP)
+                                        clang::Preprocessor &PP)
+-    : CallbackCalls(CallbackCalls), Ignore(Ignore), PP(PP) {}
 +    : Calls(CallbackCalls), PP(PP) {
 +  llvm::outs() << "PPCallbacksTracker CTOR\n";
 +}
-+
-+
+ 
+-PPCallbacksTracker::~PPCallbacksTracker() {}
+ 
 +PPCallbacksTracker::PPCallbacksTracker(PPCallbacksTracker&& o)
 +  : Calls(o.Calls), PP(o.PP) {
 +
@@ -857,50 +540,65 @@ Index: pp-trace/PPCallbacksTracker.cpp
 +  return *this;
 +}
 +
-+// Callback functions.
-+
-+// Callback invoked whenever a source file is entered or exited.
-+void PPCallbacksTracker::FileChanged(
-+    clang::SourceLocation Loc, clang::PPCallbacks::FileChangeReason Reason,
-+    clang::SrcMgr::CharacteristicKind FileType, clang::FileID PrevFID) {
+ // Callback functions.
+ 
+ // Callback invoked whenever a source file is entered or exited.
+@@ -102,11 +77,11 @@
+ void PPCallbacksTracker::FileChanged(
+     clang::SourceLocation Loc, clang::PPCallbacks::FileChangeReason Reason,
+     clang::SrcMgr::CharacteristicKind FileType, clang::FileID PrevFID) {
+-  beginCallback("FileChanged");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Reason", Reason, FileChangeReasonStrings);
+-  appendArgument("FileType", FileType, CharacteristicKindStrings);
+-  appendArgument("PrevFID", PrevFID);
 +  Calls.beginCallback("FileChanged");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Reason", Reason, FileChangeReasonStrings);
 +  Calls.appendArgument("FileType", FileType, CharacteristicKindStrings);
 +  Calls.appendArgument("PrevFID", PrevFID, PP);
-+}
-+
-+// Callback invoked whenever a source file is skipped as the result
-+// of header guard optimization.
-+void
-+PPCallbacksTracker::FileSkipped(const clang::FileEntry &SkippedFile,
-+                                const clang::Token &FilenameTok,
-+                                clang::SrcMgr::CharacteristicKind FileType) {
+ }
+ 
+ // Callback invoked whenever a source file is skipped as the result
+@@ -115,10 +90,10 @@
+ PPCallbacksTracker::FileSkipped(const clang::FileEntry &SkippedFile,
+                                 const clang::Token &FilenameTok,
+                                 clang::SrcMgr::CharacteristicKind FileType) {
+-  beginCallback("FileSkipped");
+-  appendArgument("ParentFile", &SkippedFile);
+-  appendArgument("FilenameTok", FilenameTok);
+-  appendArgument("FileType", FileType, CharacteristicKindStrings);
 +  Calls.beginCallback("FileSkipped");
 +  Calls.appendArgument("ParentFile", &SkippedFile);
 +  Calls.appendArgument("FilenameTok", FilenameTok, PP);
 +  Calls.appendArgument("FileType", FileType, CharacteristicKindStrings);
-+}
-+
-+// Callback invoked whenever an inclusion directive results in a
-+// file-not-found error.
-+bool
-+PPCallbacksTracker::FileNotFound(llvm::StringRef FileName,
-+                                 llvm::SmallVectorImpl<char> &RecoveryPath) {
+ }
+ 
+ // Callback invoked whenever an inclusion directive results in a
+@@ -126,8 +101,8 @@
+ bool
+ PPCallbacksTracker::FileNotFound(llvm::StringRef FileName,
+                                  llvm::SmallVectorImpl<char> &RecoveryPath) {
+-  beginCallback("FileNotFound");
+-  appendFilePathArgument("FileName", FileName);
 +  Calls.beginCallback("FileNotFound");
 +  Calls.appendFilePathArgument("FileName", FileName);
-+  return false;
-+}
-+
-+// Callback invoked whenever an inclusion directive of
-+// any kind (#include, #import, etc.) has been processed, regardless
-+// of whether the inclusion will actually result in an inclusion.
-+void PPCallbacksTracker::InclusionDirective(
-+    clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
-+    llvm::StringRef FileName, bool IsAngled,
-+    clang::CharSourceRange FilenameRange, const clang::FileEntry *File,
-+    llvm::StringRef SearchPath, llvm::StringRef RelativePath,
-+    const clang::Module *Imported) {
+   return false;
+ }
+ 
+@@ -140,15 +115,15 @@
+     clang::CharSourceRange FilenameRange, const clang::FileEntry *File,
+     llvm::StringRef SearchPath, llvm::StringRef RelativePath,
+     const clang::Module *Imported) {
+-  beginCallback("InclusionDirective");
+-  appendArgument("IncludeTok", IncludeTok);
+-  appendFilePathArgument("FileName", FileName);
+-  appendArgument("IsAngled", IsAngled);
+-  appendArgument("FilenameRange", FilenameRange);
+-  appendArgument("File", File);
+-  appendFilePathArgument("SearchPath", SearchPath);
+-  appendFilePathArgument("RelativePath", RelativePath);
+-  appendArgument("Imported", Imported);
 +  Calls.beginCallback("InclusionDirective");
 +  Calls.appendArgument("IncludeTok", IncludeTok, PP);
 +  Calls.appendFilePathArgument("FileName", FileName);
@@ -910,162 +608,220 @@ Index: pp-trace/PPCallbacksTracker.cpp
 +  Calls.appendFilePathArgument("SearchPath", SearchPath);
 +  Calls.appendFilePathArgument("RelativePath", RelativePath);
 +  Calls.appendArgument("Imported", Imported);
-+}
-+
-+// Callback invoked whenever there was an explicit module-import
-+// syntax.
-+void PPCallbacksTracker::moduleImport(clang::SourceLocation ImportLoc,
-+                                      clang::ModuleIdPath Path,
-+                                      const clang::Module *Imported) {
+ }
+ 
+ // Callback invoked whenever there was an explicit module-import
+@@ -156,21 +131,21 @@
+ void PPCallbacksTracker::moduleImport(clang::SourceLocation ImportLoc,
+                                       clang::ModuleIdPath Path,
+                                       const clang::Module *Imported) {
+-  beginCallback("moduleImport");
+-  appendArgument("ImportLoc", ImportLoc);
+-  appendArgument("Path", Path);
+-  appendArgument("Imported", Imported);
 +  Calls.beginCallback("moduleImport");
 +  Calls.appendArgument("ImportLoc", ImportLoc, PP);
 +  Calls.appendArgument("Path", Path, PP);
 +  Calls.appendArgument("Imported", Imported);
-+}
-+
-+// Callback invoked when the end of the main file is reached.
-+// No subsequent callbacks will be made.
+ }
+ 
+ // Callback invoked when the end of the main file is reached.
+ // No subsequent callbacks will be made.
+-void PPCallbacksTracker::EndOfMainFile() { beginCallback("EndOfMainFile"); }
 +void PPCallbacksTracker::EndOfMainFile() { Calls.beginCallback("EndOfMainFile"); }
-+
-+// Callback invoked when a #ident or #sccs directive is read.
-+void PPCallbacksTracker::Ident(clang::SourceLocation Loc, llvm::StringRef Str) {
+ 
+ // Callback invoked when a #ident or #sccs directive is read.
+ void PPCallbacksTracker::Ident(clang::SourceLocation Loc, llvm::StringRef Str) {
+-  beginCallback("Ident");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Str", Str);
 +  Calls.beginCallback("Ident");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Str", Str);
-+}
-+
-+// Callback invoked when start reading any pragma directive.
-+void
-+PPCallbacksTracker::PragmaDirective(clang::SourceLocation Loc,
-+                                    clang::PragmaIntroducerKind Introducer) {
+ }
+ 
+ // Callback invoked when start reading any pragma directive.
+@@ -177,9 +152,9 @@
+ void
+ PPCallbacksTracker::PragmaDirective(clang::SourceLocation Loc,
+                                     clang::PragmaIntroducerKind Introducer) {
+-  beginCallback("PragmaDirective");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Introducer", Introducer, PragmaIntroducerKindStrings);
 +  Calls.beginCallback("PragmaDirective");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Introducer", Introducer, PragmaIntroducerKindStrings);
-+}
-+
-+// Callback invoked when a #pragma comment directive is read.
-+void PPCallbacksTracker::PragmaComment(clang::SourceLocation Loc,
-+                                       const clang::IdentifierInfo *Kind,
-+                                       llvm::StringRef Str) {
+ }
+ 
+ // Callback invoked when a #pragma comment directive is read.
+@@ -186,10 +161,10 @@
+ void PPCallbacksTracker::PragmaComment(clang::SourceLocation Loc,
+                                        const clang::IdentifierInfo *Kind,
+                                        llvm::StringRef Str) {
+-  beginCallback("PragmaComment");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Kind", Kind);
+-  appendArgument("Str", Str);
 +  Calls.beginCallback("PragmaComment");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Kind", Kind);
 +  Calls.appendArgument("Str", Str);
-+}
-+
-+// Callback invoked when a #pragma detect_mismatch directive is
-+// read.
-+void PPCallbacksTracker::PragmaDetectMismatch(clang::SourceLocation Loc,
-+                                              llvm::StringRef Name,
-+                                              llvm::StringRef Value) {
+ }
+ 
+ // Callback invoked when a #pragma detect_mismatch directive is
+@@ -197,18 +172,18 @@
+ void PPCallbacksTracker::PragmaDetectMismatch(clang::SourceLocation Loc,
+                                               llvm::StringRef Name,
+                                               llvm::StringRef Value) {
+-  beginCallback("PragmaDetectMismatch");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Name", Name);
+-  appendArgument("Value", Value);
 +  Calls.beginCallback("PragmaDetectMismatch");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Name", Name);
 +  Calls.appendArgument("Value", Value);
-+}
-+
-+// Callback invoked when a #pragma clang __debug directive is read.
-+void PPCallbacksTracker::PragmaDebug(clang::SourceLocation Loc,
-+                                     llvm::StringRef DebugType) {
+ }
+ 
+ // Callback invoked when a #pragma clang __debug directive is read.
+ void PPCallbacksTracker::PragmaDebug(clang::SourceLocation Loc,
+                                      llvm::StringRef DebugType) {
+-  beginCallback("PragmaDebug");
+-  appendArgument("Loc", Loc);
+-  appendArgument("DebugType", DebugType);
 +  Calls.beginCallback("PragmaDebug");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("DebugType", DebugType);
-+}
-+
-+// Callback invoked when a #pragma message directive is read.
-+void PPCallbacksTracker::PragmaMessage(
-+    clang::SourceLocation Loc, llvm::StringRef Namespace,
-+    clang::PPCallbacks::PragmaMessageKind Kind, llvm::StringRef Str) {
+ }
+ 
+ // Callback invoked when a #pragma message directive is read.
+@@ -215,11 +190,11 @@
+ void PPCallbacksTracker::PragmaMessage(
+     clang::SourceLocation Loc, llvm::StringRef Namespace,
+     clang::PPCallbacks::PragmaMessageKind Kind, llvm::StringRef Str) {
+-  beginCallback("PragmaMessage");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Namespace", Namespace);
+-  appendArgument("Kind", Kind, PragmaMessageKindStrings);
+-  appendArgument("Str", Str);
 +  Calls.beginCallback("PragmaMessage");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Namespace", Namespace);
 +  Calls.appendArgument("Kind", Kind, PragmaMessageKindStrings);
 +  Calls.appendArgument("Str", Str);
-+}
-+
-+// Callback invoked when a #pragma gcc dianostic push directive
-+// is read.
-+void PPCallbacksTracker::PragmaDiagnosticPush(clang::SourceLocation Loc,
-+                                              llvm::StringRef Namespace) {
+ }
+ 
+ // Callback invoked when a #pragma gcc dianostic push directive
+@@ -226,9 +201,9 @@
+ // is read.
+ void PPCallbacksTracker::PragmaDiagnosticPush(clang::SourceLocation Loc,
+                                               llvm::StringRef Namespace) {
+-  beginCallback("PragmaDiagnosticPush");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Namespace", Namespace);
 +  Calls.beginCallback("PragmaDiagnosticPush");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Namespace", Namespace);
-+}
-+
-+// Callback invoked when a #pragma gcc dianostic pop directive
-+// is read.
-+void PPCallbacksTracker::PragmaDiagnosticPop(clang::SourceLocation Loc,
-+                                             llvm::StringRef Namespace) {
+ }
+ 
+ // Callback invoked when a #pragma gcc dianostic pop directive
+@@ -235,9 +210,9 @@
+ // is read.
+ void PPCallbacksTracker::PragmaDiagnosticPop(clang::SourceLocation Loc,
+                                              llvm::StringRef Namespace) {
+-  beginCallback("PragmaDiagnosticPop");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Namespace", Namespace);
 +  Calls.beginCallback("PragmaDiagnosticPop");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Namespace", Namespace);
-+}
-+
-+// Callback invoked when a #pragma gcc dianostic directive is read.
-+void PPCallbacksTracker::PragmaDiagnostic(clang::SourceLocation Loc,
-+                                          llvm::StringRef Namespace,
-+                                          clang::diag::Severity Mapping,
-+                                          llvm::StringRef Str) {
+ }
+ 
+ // Callback invoked when a #pragma gcc dianostic directive is read.
+@@ -245,11 +220,11 @@
+                                           llvm::StringRef Namespace,
+                                           clang::diag::Severity Mapping,
+                                           llvm::StringRef Str) {
+-  beginCallback("PragmaDiagnostic");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Namespace", Namespace);
+-  appendArgument("Mapping", (unsigned)Mapping, MappingStrings);
+-  appendArgument("Str", Str);
 +  Calls.beginCallback("PragmaDiagnostic");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Namespace", Namespace);
 +  Calls.appendArgument("Mapping", (unsigned)Mapping, MappingStrings);
 +  Calls.appendArgument("Str", Str);
-+}
-+
-+// Called when an OpenCL extension is either disabled or
-+// enabled with a pragma.
-+void PPCallbacksTracker::PragmaOpenCLExtension(
-+    clang::SourceLocation NameLoc, const clang::IdentifierInfo *Name,
-+    clang::SourceLocation StateLoc, unsigned State) {
+ }
+ 
+ // Called when an OpenCL extension is either disabled or
+@@ -257,11 +232,11 @@
+ void PPCallbacksTracker::PragmaOpenCLExtension(
+     clang::SourceLocation NameLoc, const clang::IdentifierInfo *Name,
+     clang::SourceLocation StateLoc, unsigned State) {
+-  beginCallback("PragmaOpenCLExtension");
+-  appendArgument("NameLoc", NameLoc);
+-  appendArgument("Name", Name);
+-  appendArgument("StateLoc", StateLoc);
+-  appendArgument("State", (int)State);
 +  Calls.beginCallback("PragmaOpenCLExtension");
 +  Calls.appendArgument("NameLoc", NameLoc, PP);
 +  Calls.appendArgument("Name", Name);
 +  Calls.appendArgument("StateLoc", StateLoc, PP);
 +  Calls.appendArgument("State", (int)State);
-+}
-+
-+// Callback invoked when a #pragma warning directive is read.
-+void PPCallbacksTracker::PragmaWarning(clang::SourceLocation Loc,
-+                                       llvm::StringRef WarningSpec,
-+                                       llvm::ArrayRef<int> Ids) {
+ }
+ 
+ // Callback invoked when a #pragma warning directive is read.
+@@ -268,9 +243,9 @@
+ void PPCallbacksTracker::PragmaWarning(clang::SourceLocation Loc,
+                                        llvm::StringRef WarningSpec,
+                                        llvm::ArrayRef<int> Ids) {
+-  beginCallback("PragmaWarning");
+-  appendArgument("Loc", Loc);
+-  appendArgument("WarningSpec", WarningSpec);
 +  Calls.beginCallback("PragmaWarning");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("WarningSpec", WarningSpec);
-+
-+  std::string Str;
-+  llvm::raw_string_ostream SS(Str);
-+  SS << "[";
-+  for (int i = 0, e = Ids.size(); i != e; ++i) {
-+    if (i)
-+      SS << ", ";
-+    SS << Ids[i];
-+  }
-+  SS << "]";
+ 
+   std::string Str;
+   llvm::raw_string_ostream SS(Str);
+@@ -281,21 +256,21 @@
+     SS << Ids[i];
+   }
+   SS << "]";
+-  appendArgument("Ids", SS.str());
 +  Calls.appendArgument("Ids", SS.str());
-+}
-+
-+// Callback invoked when a #pragma warning(push) directive is read.
-+void PPCallbacksTracker::PragmaWarningPush(clang::SourceLocation Loc,
-+                                           int Level) {
+ }
+ 
+ // Callback invoked when a #pragma warning(push) directive is read.
+ void PPCallbacksTracker::PragmaWarningPush(clang::SourceLocation Loc,
+                                            int Level) {
+-  beginCallback("PragmaWarningPush");
+-  appendArgument("Loc", Loc);
+-  appendArgument("Level", Level);
 +  Calls.beginCallback("PragmaWarningPush");
 +  Calls.appendArgument("Loc", Loc, PP);
 +  Calls.appendArgument("Level", Level);
-+}
-+
-+// Callback invoked when a #pragma warning(pop) directive is read.
-+void PPCallbacksTracker::PragmaWarningPop(clang::SourceLocation Loc) {
+ }
+ 
+ // Callback invoked when a #pragma warning(pop) directive is read.
+ void PPCallbacksTracker::PragmaWarningPop(clang::SourceLocation Loc) {
+-  beginCallback("PragmaWarningPop");
+-  appendArgument("Loc", Loc);
 +  Calls.beginCallback("PragmaWarningPop");
 +  Calls.appendArgument("Loc", Loc, PP);
-+}
-+
-+// Called by Preprocessor::HandleMacroExpandedIdentifier when a
-+// macro invocation is found.
-+void
-+PPCallbacksTracker::MacroExpands(const clang::Token &MacroNameTok,
-+                                 const clang::MacroDefinition &MacroDefinition,
-+                                 clang::SourceRange Range,
-+                                 const clang::MacroArgs *Args) {
+ }
+ 
+ // Called by Preprocessor::HandleMacroExpandedIdentifier when a
+@@ -305,11 +280,15 @@
+                                  const clang::MacroDefinition &MacroDefinition,
+                                  clang::SourceRange Range,
+                                  const clang::MacroArgs *Args) {
+-  beginCallback("MacroExpands");
+-  appendArgument("MacroNameTok", MacroNameTok);
+-  appendArgument("MacroDefinition", MacroDefinition);
+-  appendArgument("Range", Range);
+-  appendArgument("Args", Args);
 +  Calls.beginCallback("MacroExpands");
 +  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
 +  Calls.appendArgument("MacroDefinition", MacroDefinition);
@@ -1075,101 +831,141 @@ Index: pp-trace/PPCallbacksTracker.cpp
 +    CurrArgs.Init(MacroDefinition, Args, PP);
 +    Calls.appendArgument("Args", &CurrArgs);
 +  }
-+}
-+
-+// Hook called whenever a macro definition is seen.
-+void
-+PPCallbacksTracker::MacroDefined(const clang::Token &MacroNameTok,
-+                                 const clang::MacroDirective *MacroDirective) {
+ }
+ 
+ // Hook called whenever a macro definition is seen.
+@@ -316,9 +295,9 @@
+ void
+ PPCallbacksTracker::MacroDefined(const clang::Token &MacroNameTok,
+                                  const clang::MacroDirective *MacroDirective) {
+-  beginCallback("MacroDefined");
+-  appendArgument("MacroNameTok", MacroNameTok);
+-  appendArgument("MacroDirective", MacroDirective);
 +  Calls.beginCallback("MacroDefined");
 +  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
 +  Calls.appendArgument("MacroDirective", MacroDirective);
-+}
-+
-+// Hook called whenever a macro #undef is seen.
-+void PPCallbacksTracker::MacroUndefined(
-+    const clang::Token &MacroNameTok,
+ }
+ 
+ // Hook called whenever a macro #undef is seen.
+@@ -326,9 +305,9 @@
+     const clang::Token &MacroNameTok,
      const clang::MacroDefinition &MacroDefinition,
      const clang::MacroDirective *Undef) {
 -  beginCallback("MacroUndefined");
 -  appendArgument("MacroNameTok", MacroNameTok);
 -  appendArgument("MacroDefinition", MacroDefinition);
--}
--
--// Hook called whenever the 'defined' operator is seen.
--void PPCallbacksTracker::Defined(const clang::Token &MacroNameTok,
--                                 const clang::MacroDefinition &MacroDefinition,
--                                 clang::SourceRange Range) {
++  Calls.beginCallback("MacroUndefined");
++  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
++  Calls.appendArgument("MacroDefinition", MacroDefinition);
+ }
+ 
+ // Hook called whenever the 'defined' operator is seen.
+@@ -335,16 +314,16 @@
+ void PPCallbacksTracker::Defined(const clang::Token &MacroNameTok,
+                                  const clang::MacroDefinition &MacroDefinition,
+                                  clang::SourceRange Range) {
 -  beginCallback("Defined");
 -  appendArgument("MacroNameTok", MacroNameTok);
 -  appendArgument("MacroDefinition", MacroDefinition);
 -  appendArgument("Range", Range);
--}
--
--// Hook called when a source range is skipped.
--void PPCallbacksTracker::SourceRangeSkipped(clang::SourceRange Range) {
++  Calls.beginCallback("Defined");
++  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
++  Calls.appendArgument("MacroDefinition", MacroDefinition);
++  Calls.appendArgument("Range", Range, PP);
+ }
+ 
+ // Hook called when a source range is skipped.
+ void PPCallbacksTracker::SourceRangeSkipped(clang::SourceRange Range) {
 -  beginCallback("SourceRangeSkipped");
 -  appendArgument("Range", Range);
--}
--
--// Hook called whenever an #if is seen.
--void PPCallbacksTracker::If(clang::SourceLocation Loc,
--                            clang::SourceRange ConditionRange,
--                            ConditionValueKind ConditionValue) {
++  Calls.beginCallback("SourceRangeSkipped");
++  Calls.appendArgument("Range", Range, PP);
+ }
+ 
+ // Hook called whenever an #if is seen.
+@@ -351,10 +330,10 @@
+ void PPCallbacksTracker::If(clang::SourceLocation Loc,
+                             clang::SourceRange ConditionRange,
+                             ConditionValueKind ConditionValue) {
 -  beginCallback("If");
 -  appendArgument("Loc", Loc);
 -  appendArgument("ConditionRange", ConditionRange);
 -  appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
--}
--
--// Hook called whenever an #elif is seen.
--void PPCallbacksTracker::Elif(clang::SourceLocation Loc,
--                              clang::SourceRange ConditionRange,
--                              ConditionValueKind ConditionValue,
--                              clang::SourceLocation IfLoc) {
++  Calls.beginCallback("If");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("ConditionRange", ConditionRange, PP);
++  Calls.appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
+ }
+ 
+ // Hook called whenever an #elif is seen.
+@@ -362,11 +341,11 @@
+                               clang::SourceRange ConditionRange,
+                               ConditionValueKind ConditionValue,
+                               clang::SourceLocation IfLoc) {
 -  beginCallback("Elif");
 -  appendArgument("Loc", Loc);
 -  appendArgument("ConditionRange", ConditionRange);
 -  appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
 -  appendArgument("IfLoc", IfLoc);
--}
--
--// Hook called whenever an #ifdef is seen.
--void PPCallbacksTracker::Ifdef(clang::SourceLocation Loc,
--                               const clang::Token &MacroNameTok,
--                               const clang::MacroDefinition &MacroDefinition) {
++  Calls.beginCallback("Elif");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("ConditionRange", ConditionRange, PP);
++  Calls.appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
++  Calls.appendArgument("IfLoc", IfLoc, PP);
+ }
+ 
+ // Hook called whenever an #ifdef is seen.
+@@ -373,10 +352,10 @@
+ void PPCallbacksTracker::Ifdef(clang::SourceLocation Loc,
+                                const clang::Token &MacroNameTok,
+                                const clang::MacroDefinition &MacroDefinition) {
 -  beginCallback("Ifdef");
 -  appendArgument("Loc", Loc);
 -  appendArgument("MacroNameTok", MacroNameTok);
 -  appendArgument("MacroDefinition", MacroDefinition);
--}
--
--// Hook called whenever an #ifndef is seen.
--void PPCallbacksTracker::Ifndef(clang::SourceLocation Loc,
--                                const clang::Token &MacroNameTok,
--                                const clang::MacroDefinition &MacroDefinition) {
++  Calls.beginCallback("Ifdef");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
++  Calls.appendArgument("MacroDefinition", MacroDefinition);
+ }
+ 
+ // Hook called whenever an #ifndef is seen.
+@@ -383,272 +362,34 @@
+ void PPCallbacksTracker::Ifndef(clang::SourceLocation Loc,
+                                 const clang::Token &MacroNameTok,
+                                 const clang::MacroDefinition &MacroDefinition) {
 -  beginCallback("Ifndef");
 -  appendArgument("Loc", Loc);
 -  appendArgument("MacroNameTok", MacroNameTok);
 -  appendArgument("MacroDefinition", MacroDefinition);
--}
--
--// Hook called whenever an #else is seen.
--void PPCallbacksTracker::Else(clang::SourceLocation Loc,
--                              clang::SourceLocation IfLoc) {
++  Calls.beginCallback("Ifndef");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
++  Calls.appendArgument("MacroDefinition", MacroDefinition);
+ }
+ 
+ // Hook called whenever an #else is seen.
+ void PPCallbacksTracker::Else(clang::SourceLocation Loc,
+                               clang::SourceLocation IfLoc) {
 -  beginCallback("Else");
 -  appendArgument("Loc", Loc);
 -  appendArgument("IfLoc", IfLoc);
--}
--
--// Hook called whenever an #endif is seen.
--void PPCallbacksTracker::Endif(clang::SourceLocation Loc,
--                               clang::SourceLocation IfLoc) {
++  Calls.beginCallback("Else");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("IfLoc", IfLoc, PP);
+ }
+ 
+ // Hook called whenever an #endif is seen.
+ void PPCallbacksTracker::Endif(clang::SourceLocation Loc,
+                                clang::SourceLocation IfLoc) {
 -  beginCallback("Endif");
 -  appendArgument("Loc", Loc);
 -  appendArgument("IfLoc", IfLoc);
--}
--
++  Calls.beginCallback("Endif");
++  Calls.appendArgument("Loc", Loc, PP);
++  Calls.appendArgument("IfLoc", IfLoc, PP);
+ }
+ 
 -// Helper functions.
 -
 -// Start a new callback.
@@ -1178,8 +974,14 @@ Index: pp-trace/PPCallbacksTracker.cpp
 -  if (DisableTrace)
 -    return;
 -  CallbackCalls.push_back(CallbackCall(Name));
--}
--
++void PPCallbacksTracker::RecursiveExpansion(const clang::Token & Tok)
++{
++  auto B = getCharacterData(PP, Tok.getLocation());
++  auto tok = llvm::StringRef(B, Tok.getLength());
++  Calls.beginCallback("RecursiveExpansion");
++  Calls.appendArgument("MacroNameTok", tok);
+ }
+ 
 -// Append a bool argument to the top trace item.
 -void PPCallbacksTracker::appendArgument(const char *Name, bool Value) {
 -  appendArgument(Name, (Value ? "true" : "false"));
@@ -1417,133 +1219,28 @@ Index: pp-trace/PPCallbacksTracker.cpp
 -  const char *E = PP.getSourceManager().getCharacterData(Range.getEnd());
 -  return llvm::StringRef(B, E - B);
 -}
-+  Calls.beginCallback("MacroUndefined");
-+  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
-+  Calls.appendArgument("MacroDefinition", MacroDefinition);
-+}
-+
-+// Hook called whenever the 'defined' operator is seen.
-+void PPCallbacksTracker::Defined(const clang::Token &MacroNameTok,
-+                                 const clang::MacroDefinition &MacroDefinition,
-+                                 clang::SourceRange Range) {
-+  Calls.beginCallback("Defined");
-+  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
-+  Calls.appendArgument("MacroDefinition", MacroDefinition);
-+  Calls.appendArgument("Range", Range, PP);
-+}
-+
-+// Hook called when a source range is skipped.
-+void PPCallbacksTracker::SourceRangeSkipped(clang::SourceRange Range) {
-+  Calls.beginCallback("SourceRangeSkipped");
-+  Calls.appendArgument("Range", Range, PP);
-+}
-+
-+// Hook called whenever an #if is seen.
-+void PPCallbacksTracker::If(clang::SourceLocation Loc,
-+                            clang::SourceRange ConditionRange,
-+                            ConditionValueKind ConditionValue) {
-+  Calls.beginCallback("If");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("ConditionRange", ConditionRange, PP);
-+  Calls.appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
-+}
-+
-+// Hook called whenever an #elif is seen.
-+void PPCallbacksTracker::Elif(clang::SourceLocation Loc,
-+                              clang::SourceRange ConditionRange,
-+                              ConditionValueKind ConditionValue,
-+                              clang::SourceLocation IfLoc) {
-+  Calls.beginCallback("Elif");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("ConditionRange", ConditionRange, PP);
-+  Calls.appendArgument("ConditionValue", ConditionValue, ConditionValueKindStrings);
-+  Calls.appendArgument("IfLoc", IfLoc, PP);
-+}
-+
-+// Hook called whenever an #ifdef is seen.
-+void PPCallbacksTracker::Ifdef(clang::SourceLocation Loc,
-+                               const clang::Token &MacroNameTok,
-+                               const clang::MacroDefinition &MacroDefinition) {
-+  Calls.beginCallback("Ifdef");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
-+  Calls.appendArgument("MacroDefinition", MacroDefinition);
-+}
-+
-+// Hook called whenever an #ifndef is seen.
-+void PPCallbacksTracker::Ifndef(clang::SourceLocation Loc,
-+                                const clang::Token &MacroNameTok,
-+                                const clang::MacroDefinition &MacroDefinition) {
-+  Calls.beginCallback("Ifndef");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("MacroNameTok", MacroNameTok, PP);
-+  Calls.appendArgument("MacroDefinition", MacroDefinition);
-+}
-+
-+// Hook called whenever an #else is seen.
-+void PPCallbacksTracker::Else(clang::SourceLocation Loc,
-+                              clang::SourceLocation IfLoc) {
-+  Calls.beginCallback("Else");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("IfLoc", IfLoc, PP);
-+}
-+
-+// Hook called whenever an #endif is seen.
-+void PPCallbacksTracker::Endif(clang::SourceLocation Loc,
-+                               clang::SourceLocation IfLoc) {
-+  Calls.beginCallback("Endif");
-+  Calls.appendArgument("Loc", Loc, PP);
-+  Calls.appendArgument("IfLoc", IfLoc, PP);
-+}
-+
-+void PPCallbacksTracker::RecursiveExpansion(const clang::Token & Tok)
-+{
-+	auto B = getCharacterData(PP, Tok.getLocation());
-+	auto tok = llvm::StringRef(B, Tok.getLength());
-+	Calls.beginCallback("RecursiveExpansion");
-+	Calls.appendArgument("MacroNameTok", tok);
-+}
-+
 +// Helper functions.
-\ No newline at end of file
 Index: pp-trace/PPCallbacksTracker.h
 ===================================================================
 --- pp-trace/PPCallbacksTracker.h	(revision 302379)
 +++ pp-trace/PPCallbacksTracker.h	(working copy)
-@@ -1,247 +1,158 @@
--//===--- PPCallbacksTracker.h - Preprocessor tracking -----------*- C++ -*-===//
--//
--//                     The LLVM Compiler Infrastructure
--//
--// This file is distributed under the University of Illinois Open Source
--// License. See LICENSE.TXT for details.
--//
--//===----------------------------------------------------------------------===//
--///
--/// \file
--/// \brief Classes and definitions for preprocessor tracking.
--///
--/// The core definition is the PPCallbacksTracker class, derived from Clang's
--/// PPCallbacks class from the Lex library, which overrides all the callbacks
--/// and collects information about each callback call, saving it in a
--/// data structure built up of CallbackCall and Argument objects, which
--/// record the preprocessor callback name and arguments in high-level string
--/// form for later inspection.
--///
--//===----------------------------------------------------------------------===//
--
--#ifndef PPTRACE_PPCALLBACKSTRACKER_H
--#define PPTRACE_PPCALLBACKSTRACKER_H
--
--#include "clang/Lex/PPCallbacks.h"
--#include "clang/Lex/Preprocessor.h"
--#include "clang/Basic/SourceManager.h"
--#include "llvm/ADT/ArrayRef.h"
--#include "llvm/ADT/SmallSet.h"
--#include "llvm/ADT/StringRef.h"
--#include <string>
--#include <vector>
--
+@@ -22,6 +22,8 @@
+ #ifndef PPTRACE_PPCALLBACKSTRACKER_H
+ #define PPTRACE_PPCALLBACKSTRACKER_H
+ 
++#include "CallbackCall.h"
++#include "ArgTokens.h"
+ #include "clang/Lex/PPCallbacks.h"
+ #include "clang/Lex/Preprocessor.h"
+ #include "clang/Basic/SourceManager.h"
+@@ -28,32 +30,10 @@
+ #include "llvm/ADT/ArrayRef.h"
+ #include "llvm/ADT/SmallSet.h"
+ #include "llvm/ADT/StringRef.h"
++#include "Utils.h"
+ #include <string>
+ #include <vector>
+ 
 -/// \brief This class represents one callback function argument by name
 -///   and value.
 -class Argument {
@@ -1567,247 +1264,71 @@ Index: pp-trace/PPCallbacksTracker.h
 -  std::vector<Argument> Arguments;
 -};
 -
--/// \brief This class overrides the PPCallbacks class for tracking preprocessor
--///   activity by means of its callback functions.
--///
--/// This object is given a vector for storing the trace information, built up
--/// of CallbackCall and subordinate Argument objects for representing the
--/// callback calls and their arguments.  It's a reference so the vector can
--/// exist beyond the lifetime of this object, because it's deleted by the
--/// preprocessor automatically in its destructor.
--///
--/// This class supports a mechanism for inhibiting trace output for
--/// specific callbacks by name, for the purpose of eliminating output for
--/// callbacks of no interest that might clutter the output.
--///
--/// Following the constructor and destructor function declarations, the
--/// overidden callback functions are defined.  The remaining functions are
--/// helpers for recording the trace data, to reduce the coupling between it
--/// and the recorded data structure.
--class PPCallbacksTracker : public clang::PPCallbacks {
--public:
--  /// \brief Note that all of the arguments are references, and owned
--  /// by the caller.
--  /// \param Ignore - Set of names of callbacks to ignore.
--  /// \param CallbackCalls - Trace buffer.
--  /// \param PP - The preprocessor.  Needed for getting some argument strings.
+ /// \brief This class overrides the PPCallbacks class for tracking preprocessor
+ ///   activity by means of its callback functions.
+ ///
+@@ -72,6 +52,13 @@
+ /// helpers for recording the trace data, to reduce the coupling between it
+ /// and the recorded data structure.
+ class PPCallbacksTracker : public clang::PPCallbacks {
++
++private:
++  CallbackCalls &Calls;
++  clang::Preprocessor &PP;
++  ArgTokens CurrArgs;
++
++
+ public:
+   /// \brief Note that all of the arguments are references, and owned
+   /// by the caller.
+@@ -78,12 +65,15 @@
+   /// \param Ignore - Set of names of callbacks to ignore.
+   /// \param CallbackCalls - Trace buffer.
+   /// \param PP - The preprocessor.  Needed for getting some argument strings.
 -  PPCallbacksTracker(llvm::SmallSet<std::string, 4> &Ignore,
 -                     std::vector<CallbackCall> &CallbackCalls,
--                     clang::Preprocessor &PP);
--
--  ~PPCallbacksTracker() override;
--
--  // Overidden callback functions.
--
--  void FileChanged(clang::SourceLocation Loc,
--                   clang::PPCallbacks::FileChangeReason Reason,
--                   clang::SrcMgr::CharacteristicKind FileType,
--                   clang::FileID PrevFID = clang::FileID()) override;
--  void FileSkipped(const clang::FileEntry &SkippedFile,
--                   const clang::Token &FilenameTok,
--                   clang::SrcMgr::CharacteristicKind FileType) override;
--  bool FileNotFound(llvm::StringRef FileName,
--                    llvm::SmallVectorImpl<char> &RecoveryPath) override;
--  void InclusionDirective(clang::SourceLocation HashLoc,
--                          const clang::Token &IncludeTok,
--                          llvm::StringRef FileName, bool IsAngled,
--                          clang::CharSourceRange FilenameRange,
--                          const clang::FileEntry *File,
--                          llvm::StringRef SearchPath,
--                          llvm::StringRef RelativePath,
--                          const clang::Module *Imported) override;
--  void moduleImport(clang::SourceLocation ImportLoc, clang::ModuleIdPath Path,
--                    const clang::Module *Imported) override;
--  void EndOfMainFile() override;
--  void Ident(clang::SourceLocation Loc, llvm::StringRef str) override;
--  void PragmaDirective(clang::SourceLocation Loc,
--                       clang::PragmaIntroducerKind Introducer) override;
--  void PragmaComment(clang::SourceLocation Loc,
--                     const clang::IdentifierInfo *Kind,
--                     llvm::StringRef Str) override;
--  void PragmaDetectMismatch(clang::SourceLocation Loc, llvm::StringRef Name,
--                            llvm::StringRef Value) override;
--  void PragmaDebug(clang::SourceLocation Loc,
--                   llvm::StringRef DebugType) override;
--  void PragmaMessage(clang::SourceLocation Loc, llvm::StringRef Namespace,
--                     clang::PPCallbacks::PragmaMessageKind Kind,
--                     llvm::StringRef Str) override;
--  void PragmaDiagnosticPush(clang::SourceLocation Loc,
--                            llvm::StringRef Namespace) override;
--  void PragmaDiagnosticPop(clang::SourceLocation Loc,
--                           llvm::StringRef Namespace) override;
--  void PragmaDiagnostic(clang::SourceLocation Loc, llvm::StringRef Namespace,
--                        clang::diag::Severity mapping,
--                        llvm::StringRef Str) override;
--  void PragmaOpenCLExtension(clang::SourceLocation NameLoc,
--                             const clang::IdentifierInfo *Name,
--                             clang::SourceLocation StateLoc,
--                             unsigned State) override;
--  void PragmaWarning(clang::SourceLocation Loc, llvm::StringRef WarningSpec,
--                     llvm::ArrayRef<int> Ids) override;
--  void PragmaWarningPush(clang::SourceLocation Loc, int Level) override;
--  void PragmaWarningPop(clang::SourceLocation Loc) override;
--  void MacroExpands(const clang::Token &MacroNameTok,
--                    const clang::MacroDefinition &MD, clang::SourceRange Range,
--                    const clang::MacroArgs *Args) override;
--  void MacroDefined(const clang::Token &MacroNameTok,
--                    const clang::MacroDirective *MD) override;
--  void MacroUndefined(const clang::Token &MacroNameTok,
-+//===--- PPCallbacksTracker.h - Preprocessor tracking -----------*- C++ -*-===//
-+//
-+//                     The LLVM Compiler Infrastructure
-+//
-+// This file is distributed under the University of Illinois Open Source
-+// License. See LICENSE.TXT for details.
-+//
-+//===----------------------------------------------------------------------===//
-+///
-+/// \file
-+/// \brief Classes and definitions for preprocessor tracking.
-+///
-+/// The core definition is the PPCallbacksTracker class, derived from Clang's
-+/// PPCallbacks class from the Lex library, which overrides all the callbacks
-+/// and collects information about each callback call, saving it in a
-+/// data structure built up of CallbackCall and Argument objects, which
-+/// record the preprocessor callback name and arguments in high-level string
-+/// form for later inspection.
-+///
-+//===----------------------------------------------------------------------===//
-+
-+#ifndef PPTRACE_PPCALLBACKSTRACKER_H
-+#define PPTRACE_PPCALLBACKSTRACKER_H
-+
-+#include "CallbackCall.h"
-+#include "ArgTokens.h"
-+#include "clang/Lex/PPCallbacks.h"
-+#include "clang/Lex/Preprocessor.h"
-+#include "clang/Basic/SourceManager.h"
-+#include "llvm/ADT/ArrayRef.h"
-+#include "llvm/ADT/SmallSet.h"
-+#include "llvm/ADT/StringRef.h"
-+#include "Utils.h"
-+#include <string>
-+#include <vector>
-+
-+/// \brief This class overrides the PPCallbacks class for tracking preprocessor
-+///   activity by means of its callback functions.
-+///
-+/// This object is given a vector for storing the trace information, built up
-+/// of CallbackCall and subordinate Argument objects for representing the
-+/// callback calls and their arguments.  It's a reference so the vector can
-+/// exist beyond the lifetime of this object, because it's deleted by the
-+/// preprocessor automatically in its destructor.
-+///
-+/// This class supports a mechanism for inhibiting trace output for
-+/// specific callbacks by name, for the purpose of eliminating output for
-+/// callbacks of no interest that might clutter the output.
-+///
-+/// Following the constructor and destructor function declarations, the
-+/// overidden callback functions are defined.  The remaining functions are
-+/// helpers for recording the trace data, to reduce the coupling between it
-+/// and the recorded data structure.
-+class PPCallbacksTracker : public clang::PPCallbacks {
-+public:
-+  /// \brief Note that all of the arguments are references, and owned
-+  /// by the caller.
-+  /// \param Ignore - Set of names of callbacks to ignore.
-+  /// \param CallbackCalls - Trace buffer.
-+  /// \param PP - The preprocessor.  Needed for getting some argument strings.
 +  PPCallbacksTracker(CallbackCalls &CallbackCalls,
-+                     clang::Preprocessor &PP);
-+
+                      clang::Preprocessor &PP);
+ 
+-  ~PPCallbacksTracker() override;
 +  PPCallbacksTracker(PPCallbacksTracker&& o);
-+
+ 
 +  PPCallbacksTracker& operator=(PPCallbacksTracker&& o);
 +
 +  ~PPCallbacksTracker() { llvm::outs() << "PPCallbacksTracker DTOR\n"; }
 +
-+  // Overidden callback functions.
-+
-+  void FileChanged(clang::SourceLocation Loc,
-+                   clang::PPCallbacks::FileChangeReason Reason,
-+                   clang::SrcMgr::CharacteristicKind FileType,
-+                   clang::FileID PrevFID = clang::FileID()) override;
-+  void FileSkipped(const clang::FileEntry &SkippedFile,
-+                   const clang::Token &FilenameTok,
-+                   clang::SrcMgr::CharacteristicKind FileType) override;
-+  bool FileNotFound(llvm::StringRef FileName,
-+                    llvm::SmallVectorImpl<char> &RecoveryPath) override;
-+  void InclusionDirective(clang::SourceLocation HashLoc,
-+                          const clang::Token &IncludeTok,
-+                          llvm::StringRef FileName, bool IsAngled,
-+                          clang::CharSourceRange FilenameRange,
-+                          const clang::FileEntry *File,
-+                          llvm::StringRef SearchPath,
-+                          llvm::StringRef RelativePath,
-+                          const clang::Module *Imported) override;
-+  void moduleImport(clang::SourceLocation ImportLoc, clang::ModuleIdPath Path,
-+                    const clang::Module *Imported) override;
-+  void EndOfMainFile() override;
-+  void Ident(clang::SourceLocation Loc, llvm::StringRef str) override;
-+  void PragmaDirective(clang::SourceLocation Loc,
-+                       clang::PragmaIntroducerKind Introducer) override;
-+  void PragmaComment(clang::SourceLocation Loc,
-+                     const clang::IdentifierInfo *Kind,
-+                     llvm::StringRef Str) override;
-+  void PragmaDetectMismatch(clang::SourceLocation Loc, llvm::StringRef Name,
-+                            llvm::StringRef Value) override;
-+  void PragmaDebug(clang::SourceLocation Loc,
-+                   llvm::StringRef DebugType) override;
-+  void PragmaMessage(clang::SourceLocation Loc, llvm::StringRef Namespace,
-+                     clang::PPCallbacks::PragmaMessageKind Kind,
-+                     llvm::StringRef Str) override;
-+  void PragmaDiagnosticPush(clang::SourceLocation Loc,
-+                            llvm::StringRef Namespace) override;
-+  void PragmaDiagnosticPop(clang::SourceLocation Loc,
-+                           llvm::StringRef Namespace) override;
-+  void PragmaDiagnostic(clang::SourceLocation Loc, llvm::StringRef Namespace,
-+                        clang::diag::Severity mapping,
-+                        llvm::StringRef Str) override;
-+  void PragmaOpenCLExtension(clang::SourceLocation NameLoc,
-+                             const clang::IdentifierInfo *Name,
-+                             clang::SourceLocation StateLoc,
-+                             unsigned State) override;
-+  void PragmaWarning(clang::SourceLocation Loc, llvm::StringRef WarningSpec,
-+                     llvm::ArrayRef<int> Ids) override;
-+  void PragmaWarningPush(clang::SourceLocation Loc, int Level) override;
-+  void PragmaWarningPop(clang::SourceLocation Loc) override;
+   // Overidden callback functions.
+ 
+   void FileChanged(clang::SourceLocation Loc,
+@@ -134,7 +124,7 @@
+                      llvm::ArrayRef<int> Ids) override;
+   void PragmaWarningPush(clang::SourceLocation Loc, int Level) override;
+   void PragmaWarningPop(clang::SourceLocation Loc) override;
+-  void MacroExpands(const clang::Token &MacroNameTok,
 +  virtual void MacroExpands(const clang::Token &MacroNameTok,
-+                    const clang::MacroDefinition &MD, clang::SourceRange Range,
-+                    const clang::MacroArgs *Args) override;
-+  void MacroDefined(const clang::Token &MacroNameTok,
-+                    const clang::MacroDirective *MD) override;
-+  void MacroUndefined(const clang::Token &MacroNameTok,
-                       const clang::MacroDefinition &MD,
-                       const clang::MacroDirective *Undef) override;
--  void Defined(const clang::Token &MacroNameTok,
--               const clang::MacroDefinition &MD,
--               clang::SourceRange Range) override;
--  void SourceRangeSkipped(clang::SourceRange Range) override;
--  void If(clang::SourceLocation Loc, clang::SourceRange ConditionRange,
--          ConditionValueKind ConditionValue) override;
--  void Elif(clang::SourceLocation Loc, clang::SourceRange ConditionRange,
--            ConditionValueKind ConditionValue, clang::SourceLocation IfLoc) override;
--  void Ifdef(clang::SourceLocation Loc, const clang::Token &MacroNameTok,
--             const clang::MacroDefinition &MD) override;
--  void Ifndef(clang::SourceLocation Loc, const clang::Token &MacroNameTok,
--              const clang::MacroDefinition &MD) override;
--  void Else(clang::SourceLocation Loc,
--            clang::SourceLocation IfLoc) override;
--  void Endif(clang::SourceLocation Loc,
--             clang::SourceLocation IfLoc) override;
--
+                     const clang::MacroDefinition &MD, clang::SourceRange Range,
+                     const clang::MacroArgs *Args) override;
+   void MacroDefined(const clang::Token &MacroNameTok,
+@@ -158,90 +148,13 @@
+             clang::SourceLocation IfLoc) override;
+   void Endif(clang::SourceLocation Loc,
+              clang::SourceLocation IfLoc) override;
++  void RecursiveExpansion(const clang::Token& Tok) override;
+ 
 -  // Helper functions.
--
++  const ArgTokens* GetCurrentArgs() const { return &CurrArgs; }
+ 
 -  /// \brief Start a new callback.
 -  void beginCallback(const char *Name);
--
++  CallbackCalls& GetCalls() const { return Calls; }
+ 
 -  /// \brief Append a string to the top trace item.
 -  void append(const char *Str);
--
++};
+ 
 -  /// \brief Append a bool argument to the top trace item.
 -  void appendArgument(const char *Name, bool Value);
--
+ 
 -  /// \brief Append an int argument to the top trace item.
 -  void appendArgument(const char *Name, int Value);
 -
@@ -1882,38 +1403,7 @@ Index: pp-trace/PPCallbacksTracker.h
 -  clang::Preprocessor &PP;
 -};
 -
--#endif // PPTRACE_PPCALLBACKSTRACKER_H
-+  void Defined(const clang::Token &MacroNameTok,
-+               const clang::MacroDefinition &MD,
-+               clang::SourceRange Range) override;
-+  void SourceRangeSkipped(clang::SourceRange Range) override;
-+  void If(clang::SourceLocation Loc, clang::SourceRange ConditionRange,
-+          ConditionValueKind ConditionValue) override;
-+  void Elif(clang::SourceLocation Loc, clang::SourceRange ConditionRange,
-+            ConditionValueKind ConditionValue, clang::SourceLocation IfLoc) override;
-+  void Ifdef(clang::SourceLocation Loc, const clang::Token &MacroNameTok,
-+             const clang::MacroDefinition &MD) override;
-+  void Ifndef(clang::SourceLocation Loc, const clang::Token &MacroNameTok,
-+              const clang::MacroDefinition &MD) override;
-+  void Else(clang::SourceLocation Loc,
-+            clang::SourceLocation IfLoc) override;
-+  void Endif(clang::SourceLocation Loc,
-+             clang::SourceLocation IfLoc) override;
-+  void RecursiveExpansion(const clang::Token& Tok) override;
-+
-+  auto GetCurrentArgs() const { return &CurrArgs; }
-+
-+  auto& GetCalls() const { return Calls; }
-+
-+private:
-+
-+  clang::Preprocessor &PP;
-+  CallbackCalls &Calls;
-+  ArgTokens CurrArgs;
-+};
-+
-+
-+#endif // PPTRACE_PPCALLBACKSTRACKER_H
+ #endif // PPTRACE_PPCALLBACKSTRACKER_H
 Index: pp-trace/PPTrace.cpp
 ===================================================================
 --- pp-trace/PPTrace.cpp	(revision 302379)
@@ -1968,22 +1458,22 @@ Index: pp-trace/PPTrace.cpp
 -  PPTraceAction(SmallSet<std::string, 4> &Ignore,
 -                std::vector<CallbackCall> &CallbackCalls)
 -      : Ignore(Ignore), CallbackCalls(CallbackCalls) {}
-+  PPTraceAction(CallbackCalls &CallbackCalls, bool VerboseMode)
-+      : CallbackCalls(CallbackCalls), VerboseMode(VerboseMode) {}
++  PPTraceAction(CallbackCalls &Calls, bool VerboseMode)
++      : Calls(Calls), VerboseMode(VerboseMode) {}
  
  protected:
    std::unique_ptr<clang::ASTConsumer>
    CreateASTConsumer(CompilerInstance &CI, StringRef InFile) override {
 -    return llvm::make_unique<PPTraceConsumer>(Ignore, CallbackCalls,
 -                                              CI.getPreprocessor());
-+    return llvm::make_unique<PPTraceConsumer>(CallbackCalls,
++    return llvm::make_unique<PPTraceConsumer>(Calls,
 +                                              CI.getPreprocessor(), VerboseMode);
    }
  
  private:
 -  SmallSet<std::string, 4> &Ignore;
 -  std::vector<CallbackCall> &CallbackCalls;
-+  CallbackCalls &CallbackCalls;
++  CallbackCalls &Calls;
 +  bool VerboseMode;
  };
  
@@ -1992,18 +1482,18 @@ Index: pp-trace/PPTrace.cpp
 -  PPTraceFrontendActionFactory(SmallSet<std::string, 4> &Ignore,
 -                               std::vector<CallbackCall> &CallbackCalls)
 -      : Ignore(Ignore), CallbackCalls(CallbackCalls) {}
-+  PPTraceFrontendActionFactory(CallbackCalls &CallbackCalls, bool VerboseMode)
-+      : CallbackCalls(CallbackCalls), VerboseMode(VerboseMode) {}
++  PPTraceFrontendActionFactory(CallbackCalls &Calls, bool VerboseMode)
++      : Calls(Calls), VerboseMode(VerboseMode) {}
  
    PPTraceAction *create() override {
 -    return new PPTraceAction(Ignore, CallbackCalls);
-+    return new PPTraceAction(CallbackCalls, VerboseMode);
++    return new PPTraceAction(Calls, VerboseMode);
    }
  
  private:
 -  SmallSet<std::string, 4> &Ignore;
 -  std::vector<CallbackCall> &CallbackCalls;
-+  CallbackCalls &CallbackCalls;
++  CallbackCalls &Calls;
 +  bool VerboseMode;
  };
  } // namespace
@@ -2091,7 +1581,7 @@ Index: pp-trace/Utils.h
 ===================================================================
 --- pp-trace/Utils.h	(nonexistent)
 +++ pp-trace/Utils.h	(working copy)
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,79 @@
 +#ifndef PPTRACE_UTILS_H
 +#define PPTRACE_UTILS_H
 +
@@ -2106,70 +1596,68 @@ Index: pp-trace/Utils.h
 +// Utility functions.
 +
 +// Get a "file:line:column" source location string.
-+inline auto getSourceLocationString(const clang::Preprocessor& PP,
-+	clang::SourceLocation Loc) {
-+	if (Loc.isInvalid())
-+		return std::string("(none)");
++inline std::string getSourceLocationString(const clang::Preprocessor& PP,
++  clang::SourceLocation Loc) {
++  if (Loc.isInvalid())
++    return std::string("(none)");
 +
-+	if (Loc.isFileID()) {
-+		const auto PLoc = PP.getSourceManager().getPresumedLoc(Loc);
++  if (Loc.isFileID()) {
++    const auto PLoc = PP.getSourceManager().getPresumedLoc(Loc);
 +
-+		if (PLoc.isInvalid()) {
-+			return std::string("(invalid)");
-+		}
++    if (PLoc.isInvalid()) {
++      return std::string("(invalid)");
++    }
 +
-+		std::string Str;
-+		llvm::raw_string_ostream SS(Str);
++    std::string Str;
++    llvm::raw_string_ostream SS(Str);
 +
-+		// The macro expansion and spelling pos is identical for file locs.
-+		SS << "\"" << PLoc.getFilename() << ':' << PLoc.getLine() << ':'
-+			<< PLoc.getColumn() << "\"";
++    // The macro expansion and spelling pos is identical for file locs.
++    SS << "\"" << PLoc.getFilename() << ':' << PLoc.getLine() << ':'
++      << PLoc.getColumn() << "\"";
 +
-+		auto Result = SS.str();
++    auto Result = SS.str();
 +
-+		// YAML treats backslash as escape, so use forward slashes.
-+		std::replace(Result.begin(), Result.end(), '\\', '/');
++    // YAML treats backslash as escape, so use forward slashes.
++    std::replace(Result.begin(), Result.end(), '\\', '/');
 +
-+		return Result;
-+	}
++    return Result;
++  }
 +
-+	return std::string("(nonfile)");
++  return std::string("(nonfile)");
 +}
 +
-+inline auto getCharacterData(const clang::Preprocessor &PP, const clang::SourceLocation& Loc) {
-+	return PP.getSourceManager().getCharacterData(Loc);
++inline const char* getCharacterData(const clang::Preprocessor &PP,
++                                    const clang::SourceLocation& Loc) {
++  return PP.getSourceManager().getCharacterData(Loc);
 +}
 +
 +// Get the raw source string of the range.
 +template <typename T>
-+inline auto getSourceString(const clang::Preprocessor &PP, const T& Range) {
-+	const auto B = getCharacterData(PP, Range.getBegin());
-+	const auto E = getCharacterData(PP, Range.getEnd());
-+	return llvm::StringRef(B, E - B + 1).trim();
++inline llvm::StringRef getSourceString(const clang::Preprocessor &PP,
++                                       const T& Range) {
++  const auto B = getCharacterData(PP, Range.getBegin());
++  const auto E = getCharacterData(PP, Range.getEnd());
++  return llvm::StringRef(B, E - B + 1).trim();
 +}
 +
 +// Output the trace given its data structure and a stream.
-+inline auto outputPPTrace(CallbackCalls &CallbackCalls,
-+	llvm::raw_ostream &OS) {
-+	// Mark start of document.
-+	OS << "---\n";
++inline int outputPPTrace(CallbackCalls &CallbackCalls,
++  llvm::raw_ostream &OS) {
++  // Mark start of document.
++  OS << "---\n";
 +
-+	for (const auto& Callback : CallbackCalls) {
-+		OS << "- Callback: " << Callback.Name << "\n";
++  for (const auto& Callback : CallbackCalls) {
++    OS << "- Callback: " << Callback.Name << "\n";
 +
-+		for (const auto& Arg : Callback.Arguments) {
-+			OS << "  " << Arg.Name << ": " << Arg.Value << "\n";
-+		}
-+	}
++    for (const auto& Arg : Callback.Arguments) {
++      OS << "  " << Arg.Name << ": " << Arg.Value << "\n";
++    }
++  }
 +
-+	// Mark end of document.
-+	OS << "...\n";
++  // Mark end of document.
++  OS << "...\n";
 +
-+	return 0;
-+}
-+
-+inline auto extractMacroArgTokens(const clang::MacroArgs* Args, clang::Preprocessor& PP) {
-+
++  return 0;
 +}
 +
 +#endif // PPTRACE_UTILS_H
@@ -2177,7 +1665,7 @@ Index: pp-trace/VerboseDecorator.cpp
 ===================================================================
 --- pp-trace/VerboseDecorator.cpp	(nonexistent)
 +++ pp-trace/VerboseDecorator.cpp	(working copy)
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,70 @@
 +#include "VerboseDecorator.h"
 +#include <numeric>
 +
@@ -2185,99 +1673,102 @@ Index: pp-trace/VerboseDecorator.cpp
 +using namespace clang;
 +
 +VerboseDecorator::VerboseDecorator(CallbackCalls& CallbackCalls,
-+	                                   clang::Preprocessor & PP,
-+                                     std::unique_ptr<PPCallbacksTracker> Tracker)
-+	: PPCallbacksTracker(CallbackCalls, PP),
-+    Tracker(std::move(Tracker)), 
-+    PP(PP) {
++                                   clang::Preprocessor & PP,
++                                   std::unique_ptr<PPCallbacksTracker> Tracker)
++    : PPCallbacksTracker(CallbackCalls, PP),
++      Tracker(std::move(Tracker)), 
++      PP(PP) {
 +  llvm::outs() << "VerboseDecorator CTOR\n";
 +}
 +
 +
 +VerboseDecorator::VerboseDecorator(VerboseDecorator&& o)
-+  : PPCallbacksTracker(o.Tracker->GetCalls(), o.PP),
-+    Tracker(std::move(o.Tracker)),
-+    PP(o.PP) {
++    : PPCallbacksTracker(o.Tracker->GetCalls(), o.PP),
++      Tracker(std::move(o.Tracker)),
++      PP(o.PP) {
 +
-+  llvm::outs() << "VerboseDecorator MOVE CTOR\n";
++    llvm::outs() << "VerboseDecorator MOVE CTOR\n";
 +}
 +
 +VerboseDecorator& VerboseDecorator::operator=(VerboseDecorator&& o) {
-+  llvm::outs() << "VerboseDecorator MOVE ASSIGN\n";
-+  if (this != &o) {
-+    Tracker.release();
-+    Tracker = std::move(o.Tracker);
-+  }
++    llvm::outs() << "VerboseDecorator MOVE ASSIGN\n";
++    if (this != &o) {
++        Tracker.release();
++        Tracker = std::move(o.Tracker);
++    }
 +
-+  return *this;
++    return *this;
 +}
 +
 +void VerboseDecorator::MacroExpands(const clang::Token &MacroNameTok,
-+	const clang::MacroDefinition &MD, clang::SourceRange Range,
-+	const clang::MacroArgs *Args) {
-+	Tracker->MacroExpands(MacroNameTok, MD, Range, Args);
++    const clang::MacroDefinition &MD, clang::SourceRange Range,
++    const clang::MacroArgs *Args) {
++    Tracker->MacroExpands(MacroNameTok, MD, Range, Args);
 +
-+  const auto DefBody = MD.getMacroInfo()->tokens();
-+  auto RawDefBody = std::vector<std::string>(DefBody.size());
++    const auto DefBody = MD.getMacroInfo()->tokens();
++    auto RawDefBody = std::vector<std::string>(DefBody.size());
 +
-+  for (const auto& t : DefBody) {
-+    auto Begin = getCharacterData(PP, t.getLocation());
-+    const auto tok = StringRef(Begin, t.getLength());
-+    RawDefBody.push_back(tok);
-+  }
-+
-+  for (const auto &CurrArg : *Tracker->GetCurrentArgs()) {
-+    for (auto &BodyToken : RawDefBody) {
-+      if (std::get<0>(CurrArg).compare(BodyToken) == 0) {
-+        auto ArgTokens = &std::get<1>(CurrArg);
-+        BodyToken =
-+          std::accumulate(ArgTokens->cbegin(), ArgTokens->cend(), std::string(""));
-+      }
++    for (const auto& t : DefBody) {
++        auto Begin = getCharacterData(PP, t.getLocation());
++        const auto tok = StringRef(Begin, t.getLength());
++        RawDefBody.push_back(tok);
 +    }
-+  }
 +
-+	Tracker.get()->GetCalls().appendArgument("ExpandedTokens",
++    for (const auto &CurrArg : *Tracker->GetCurrentArgs()) {
++        for (auto &BodyToken : RawDefBody) {
++            if (std::get<0>(CurrArg).compare(BodyToken) == 0) {
++                auto ArgTokens = &std::get<1>(CurrArg);
++                BodyToken =
++                std::accumulate(ArgTokens->cbegin(), ArgTokens->cend(), std::string(""));
++            }
++        }
++    }
++
++    Tracker.get()->GetCalls().appendArgument("ExpandedTokens",
 +    std::accumulate(RawDefBody.begin(),RawDefBody.end(), std::string("")));
 +}
 +
 +void VerboseDecorator::MacroDefined(const clang::Token &MacroNameTok,
-+	const clang::MacroDirective *MD) {
-+  Tracker->MacroDefined(MacroNameTok, MD);
++    const clang::MacroDirective *MD) {
++    Tracker->MacroDefined(MacroNameTok, MD);
 +
-+	const auto likeness = MD->getDefinition().getMacroInfo()->isObjectLike();
-+	Tracker->GetCalls().appendArgument("Likeness",
-+		likeness ? "Object" : "Function");
-+	Tracker->GetCalls().appendArgument("Loc", MD->getLocation(), PP);
++    const auto likeness = MD->getDefinition().getMacroInfo()->isObjectLike();
++    Tracker->GetCalls().appendArgument("Likeness", likeness ? "Object" : "Function");
++    Tracker->GetCalls().appendArgument("Loc", MD->getLocation(), PP);
 +}
 Index: pp-trace/VerboseDecorator.h
 ===================================================================
 --- pp-trace/VerboseDecorator.h	(nonexistent)
 +++ pp-trace/VerboseDecorator.h	(working copy)
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,28 @@
++#ifndef PPTRACE_VERBOSE_DECORATOR_H
++#define PPTRACE_VERBOSE_DECORATOR_H
++
 +#include "PPCallbacksTracker.h"
 +
 +class VerboseDecorator : public PPCallbacksTracker {
 +public:
-+	VerboseDecorator(CallbackCalls& CallbackCalls,
-+		clang::Preprocessor &PP, std::unique_ptr<PPCallbacksTracker> Tracker);
-+  VerboseDecorator(VerboseDecorator&& o);
-+  VerboseDecorator& operator=(VerboseDecorator&& o);
++    VerboseDecorator(CallbackCalls& CallbackCalls,
++        clang::Preprocessor &PP, std::unique_ptr<PPCallbacksTracker> Tracker);
++    VerboseDecorator(VerboseDecorator&& o);
++    VerboseDecorator& operator=(VerboseDecorator&& o);
 +
-+  ~VerboseDecorator() { llvm::outs() << "VerboseDecorator DTOR\n"; }
++    ~VerboseDecorator() { llvm::outs() << "VerboseDecorator DTOR\n"; }
 +
-+	void MacroExpands(const clang::Token &MacroNameTok,
-+		const clang::MacroDefinition &MD, clang::SourceRange Range,
-+		const clang::MacroArgs *Args) override;
-+	void MacroDefined(const clang::Token &MacroNameTok,
-+		const clang::MacroDirective *MD) override;
++    void MacroExpands(const clang::Token &MacroNameTok,
++    const clang::MacroDefinition &MD, clang::SourceRange Range,
++    const clang::MacroArgs *Args) override;
++    void MacroDefined(const clang::Token &MacroNameTok,
++    const clang::MacroDirective *MD) override;
 +
 +private:
 +
-+  clang::Preprocessor &PP;
-+  std::unique_ptr<PPCallbacksTracker> Tracker = nullptr;
-+
++    std::unique_ptr<PPCallbacksTracker> Tracker;
++    clang::Preprocessor &PP;
 +};
-\ No newline at end of file
++
++#endif // PPTRACE_VERBOSE_DECORATOR_H
++
 Index: test/pp-trace/pp-trace-macro.cpp
 ===================================================================
 --- test/pp-trace/pp-trace-macro.cpp	(revision 302379)
@@ -2300,13 +1791,11 @@ Index: test/pp-trace/pp-trace-macro.cpp
  // CHECK-NEXT: - Callback: MacroDefined
  // CHECK-NEXT:   MacroNameTok: X
  // CHECK-NEXT:   MacroDirective: MD_Define
-@@ -85,17 +85,23 @@
- // CHECK-NEXT: - Callback: MacroExpands
+@@ -86,16 +86,22 @@
  // CHECK-NEXT:   MacroNameTok: X
  // CHECK-NEXT:   MacroDefinition: [(local)]
--// CHECK-NEXT:   Range: ["{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1", "{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1"]
+ // CHECK-NEXT:   Range: ["{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1", "{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1"]
 -// CHECK-NEXT:   Args: (null)
-+// CHECK-NEXT:   Range: ["{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1", "{{.*}}{{[/\\]}}pp-trace-macro.cpp:15:1"]
 +// CHECK-NEXT: - Callback: RecursiveExpansion
 +// CHECK-NEXT:   MacroNameTok: X_IMPL
  // CHECK-NEXT: - Callback: MacroExpands
